@@ -40,6 +40,7 @@ interface CheckoutModalProps {
 export default function CheckoutModal({ isOpen, onClose, dress, bookingDetails, onPaymentSuccess, settings, team }: CheckoutModalProps) {
   const [isProcessing, setIsProcessing] = useState(false);
   const [isSuccess, setIsSuccess] = useState(false);
+  const [copiedBooking, setCopiedBooking] = useState(false);
   
   // Payment option: 'magasin' (Payment in store) or 'baridimob' (Algerian BaridiMob mobile CCP transfer)
   const [selectedMethod, setSelectedMethod] = useState<'magasin' | 'baridimob'>('magasin');
@@ -49,6 +50,36 @@ export default function CheckoutModal({ isOpen, onClose, dress, bookingDetails, 
   const copyToClipboard = (text: string) => {
     navigator.clipboard.writeText(text);
     alert("RIP BaridiMob copié avec succès !");
+  };
+
+  const copyBookingToClipboard = (text: string) => {
+    try {
+      if (navigator.clipboard && navigator.clipboard.writeText) {
+        navigator.clipboard.writeText(text);
+        setCopiedBooking(true);
+        setTimeout(() => setCopiedBooking(false), 3000);
+      } else {
+        throw new Error("Navigator clipboard not available");
+      }
+    } catch (err) {
+      const textArea = document.createElement("textarea");
+      textArea.value = text;
+      textArea.style.position = "fixed";
+      textArea.style.top = "0";
+      textArea.style.left = "0";
+      textArea.style.opacity = "0";
+      document.body.appendChild(textArea);
+      textArea.focus();
+      textArea.select();
+      try {
+        document.execCommand('copy');
+        setCopiedBooking(true);
+        setTimeout(() => setCopiedBooking(false), 3000);
+      } catch (e) {
+        console.error("Fallback copy failed", e);
+      }
+      document.body.removeChild(textArea);
+    }
   };
 
   const handleSubmit = (e: React.FormEvent) => {
@@ -421,14 +452,41 @@ export default function CheckoutModal({ isOpen, onClose, dress, bookingDetails, 
                       <div className="border-t border-dashed border-bento-gold/20 pt-2 space-y-2 font-sans text-[10px]">
                         <div className="bg-amber-50 text-amber-900 p-3 border border-amber-200 flex flex-col gap-1.5 text-left leading-relaxed">
                           <p className="font-bold uppercase tracking-wider text-[8.5px] flex items-center gap-1 text-amber-800">
-                            🚨 ACTION OBLIGATOIRE POUR VALIDER :
+                            🚨 ACTION REQUISE POUR VALIDER LA RÉSERVATION :
                           </p>
                           <p>
-                            Pour bloquer définitivement votre robe de mariée ou création kabyle auprès de notre boutique <strong>Coup de Cœur (Tizi Ouzou)</strong>, vous devez obligatoirement envoyer l'alerte à notre équipe.
+                            Pour bloquer définitivement votre tenue auprès de notre boutique <strong>Coup de Cœur (Tizi Ouzou)</strong>, vous devez transmettre les détails de votre réservation par WhatsApp ou E-mail.
                           </p>
                           <p className="text-[9px] text-amber-700 font-medium">
-                            Cliquez sur le bouton vert ci-dessous pour transmettre automatiquement les détails de votre réservation par WhatsApp.
+                            Si les boutons ci-dessous ne s'ouvrent pas, copiez le texte de réservation ci-dessous et envoyez-le manuellement sur WhatsApp au numéro : <strong>{adminWhatsapp}</strong>.
                           </p>
+                        </div>
+
+                        {/* Copy details block */}
+                        <div className="bg-bento-bg p-2.5 border border-bento-gold/20 flex flex-col gap-2">
+                          <p className="font-bold uppercase tracking-widest text-[8px] text-bento-gold">Texte de réservation à transmettre :</p>
+                          <textarea
+                            readOnly
+                            value={messageText}
+                            className="w-full text-[9px] font-mono bg-white p-2 border border-bento-gold/10 h-24 focus:outline-none resize-none select-all text-bento-text"
+                          />
+                          <button
+                            type="button"
+                            onClick={() => copyBookingToClipboard(messageText)}
+                            className="bg-bento-gold hover:bg-bento-gold-dark text-white font-sans uppercase tracking-wider text-[8.5px] py-2 font-bold transition-all flex items-center justify-center gap-1.5 cursor-pointer"
+                          >
+                            {copiedBooking ? (
+                              <>
+                                <Check className="w-3.5 h-3.5 stroke-[3] text-white" />
+                                Message Copié avec succès !
+                              </>
+                            ) : (
+                              <>
+                                <Copy className="w-3.5 h-3.5" />
+                                Copier le message de réservation
+                              </>
+                            )}
+                          </button>
                         </div>
                       </div>
                     </div>
