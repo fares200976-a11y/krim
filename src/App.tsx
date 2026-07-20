@@ -41,6 +41,11 @@ export default function App() {
         if (!parsed.notificationEmail) parsed.notificationEmail = DEFAULT_SETTINGS.notificationEmail;
         if (!parsed.notificationWhatsapp) parsed.notificationWhatsapp = DEFAULT_SETTINGS.notificationWhatsapp;
         
+        // Migrate old static homepage background image to new default video
+        if (!parsed.homepageBg || parsed.homepageBg === 'https://images.unsplash.com/photo-1549417229-aa67d3263c09?auto=format&fit=crop&w=1920&q=80') {
+          parsed.homepageBg = DEFAULT_SETTINGS.homepageBg;
+        }
+        
         const merged = { ...DEFAULT_SETTINGS, ...parsed };
         setSettings(merged);
         localStorage.setItem('boutique_settings', JSON.stringify(merged));
@@ -409,13 +414,30 @@ export default function App() {
               currentSlideIdx === idx ? 'opacity-80 z-10' : 'opacity-0 z-0'
             }`}
           >
-            {/* Background image dynamically customized from settings or carousel defaults */}
-            <img 
-              src={idx === 0 && settings.homepageBg ? settings.homepageBg : slide.image} 
-              alt={slide.title} 
-              className="w-full h-full object-cover scale-105 transform motion-safe:animate-pulse filter contrast-105" 
-              style={{ animationDuration: '12s' }}
-            />
+            {/* Background image or video dynamically customized from settings or carousel defaults */}
+            {idx === 0 && settings.homepageBg && (
+              settings.homepageBg.startsWith('data:video/') || 
+              settings.homepageBg.includes('.mp4') || 
+              settings.homepageBg.includes('.webm') || 
+              settings.homepageBg.includes('.mov') || 
+              settings.homepageBg.includes('mixkit.co/videos/')
+            ) ? (
+              <video
+                src={settings.homepageBg}
+                autoPlay
+                loop
+                muted
+                playsInline
+                className="w-full h-full object-cover scale-105 transform filter contrast-105 brightness-90"
+              />
+            ) : (
+              <img 
+                src={idx === 0 && settings.homepageBg ? settings.homepageBg : slide.image} 
+                alt={slide.title} 
+                className="w-full h-full object-cover scale-105 transform motion-safe:animate-pulse filter contrast-105" 
+                style={{ animationDuration: '12s' }}
+              />
+            )}
             {/* Overlay gradient */}
             <div className="absolute inset-0 bg-gradient-to-t from-bento-dark/90 via-bento-dark/50 to-transparent" />
           </div>
