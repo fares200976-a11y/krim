@@ -660,55 +660,61 @@ export default function App() {
           </div>
 
           {/* Videos Showcase Grid */}
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 md:gap-8 lg:gap-12">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6 md:gap-8 lg:gap-12">
             
             {/* Custom Interactive Main Video (Defile Videos managed by Admin) */}
-            {defileVideos.map((v) => (
-              <div key={v.id} className="space-y-2 md:space-y-4">
-                <div className="relative aspect-video rounded-md overflow-hidden shadow-2xl bg-bento-dark group border border-bento-gold/25">
-                  {playingVideoId === v.id ? (
-                    <video
-                      src={v.videoUrl}
-                      controls
-                      autoPlay
-                      loop
-                      className="w-full h-full object-cover"
-                    />
-                  ) : (
-                    <>
-                      <img src={v.coverImage} alt={v.title} className="w-full h-full object-cover brightness-75 transition-transform duration-500 group-hover:scale-105" />
-                      
-                      {/* Play Button Overlay */}
-                      <button
-                        onClick={() => setPlayingVideoId(v.id)}
-                        className="absolute inset-0 flex items-center justify-center bg-black/30 group-hover:bg-black/45 transition-colors cursor-pointer"
-                      >
-                        <div className="w-12 h-12 md:w-16 md:h-16 rounded-full bg-gold-gradient flex items-center justify-center text-white shadow-xl hover:scale-105 transition-transform">
-                          <Play className="w-4 h-4 md:w-6 md:h-6 fill-current text-white ml-1" />
-                        </div>
-                      </button>
-
-                      {/* Info Badge */}
-                      <div className="absolute bottom-2 left-2 right-2 md:bottom-4 md:left-4 md:right-4 bg-bento-dark/95 backdrop-blur-md p-3 md:p-4 rounded-none flex flex-col sm:flex-row sm:items-center justify-between border border-bento-gold/25 gap-2">
-                        <div className="space-y-0.5 min-w-0">
-                          <p className="text-[8px] md:text-[9px] uppercase tracking-widest font-sans font-bold text-bento-gold">{v.category}</p>
-                          <h4 className="font-serif font-medium text-xs md:text-sm text-white uppercase tracking-wide truncate">{v.title}</h4>
-                          <p className="text-[9px] md:text-[10px] text-white/60 font-sans line-clamp-1">{v.description}</p>
-                        </div>
-                        <a
-                          href={`https://wa.me/213550123456?text=Bonjour%20Boutique%20Coup%20de%20C%C5%93ur,%20je%20suis%20int%C3%A9ress%C3%A9(e)%20par%20la%20tenue%20vue%20sur%20le%20d%C3%A9fil%C3%A9%20%22${encodeURIComponent(v.title)}%22.`}
-                          target="_blank"
-                          referrerPolicy="no-referrer"
-                          className="bg-bento-gold hover:bg-bento-gold-dark text-white text-[9px] md:text-[10px] font-sans uppercase tracking-widest px-3 py-1.5 md:px-4 md:py-2 rounded-none cursor-pointer transition-colors text-center shrink-0"
+            {defileVideos.map((v) => {
+              const whatsappClean = settings.notificationWhatsapp?.replace(/^00/, '').replace(/^\+/, '') || '213553318195';
+              return (
+                <div key={v.id} className="flex flex-col rounded-md overflow-hidden shadow-2xl bg-bento-dark/80 border border-bento-gold/20 transition-all duration-300 hover:border-bento-gold/40">
+                  
+                  {/* Media Container */}
+                  <div className="relative aspect-video w-full overflow-hidden bg-black/40">
+                    {playingVideoId === v.id ? (
+                      <video
+                        src={v.videoUrl}
+                        controls
+                        autoPlay
+                        loop
+                        className="w-full h-full object-cover"
+                      />
+                    ) : (
+                      <>
+                        <img src={v.coverImage} alt={v.title} className="w-full h-full object-cover brightness-75 transition-transform duration-500 hover:scale-105" />
+                        
+                        {/* Play Button Overlay */}
+                        <button
+                          onClick={() => setPlayingVideoId(v.id)}
+                          className="absolute inset-0 flex items-center justify-center bg-black/30 hover:bg-black/45 transition-colors cursor-pointer group"
                         >
-                          S'informer
-                        </a>
-                      </div>
-                    </>
-                  )}
+                          <div className="w-12 h-12 md:w-16 md:h-16 rounded-full bg-gold-gradient flex items-center justify-center text-white shadow-xl group-hover:scale-105 transition-transform">
+                            <Play className="w-4 h-4 md:w-6 md:h-6 fill-current text-white ml-1" />
+                          </div>
+                        </button>
+                      </>
+                    )}
+                  </div>
+
+                  {/* Info & Call-To-Action Block (Optimized for vertical readability on all phone models) */}
+                  <div className="p-4 md:p-5 flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-t border-bento-gold/15 bg-bento-dark">
+                    <div className="space-y-1 min-w-0 flex-1">
+                      <p className="text-[9px] uppercase tracking-widest font-sans font-bold text-bento-gold">{v.category}</p>
+                      <h4 className="font-serif font-light text-sm md:text-base text-white uppercase tracking-wide truncate" title={v.title}>{v.title}</h4>
+                      <p className="text-[10px] md:text-xs text-white/60 font-sans line-clamp-2 leading-relaxed">{v.description}</p>
+                    </div>
+                    <a
+                      href={`https://wa.me/${whatsappClean}?text=Bonjour%20Boutique%20Coup%20de%20C%C5%93ur,%20je%20suis%20int%C3%A9ress%C3%A9(e)%20par%20la%20tenue%20vue%20sur%20le%20d%C3%A9fil%C3%A9%20%22${encodeURIComponent(v.title)}%22.`}
+                      target="_blank"
+                      referrerPolicy="no-referrer"
+                      className="bg-bento-gold hover:bg-bento-gold-dark text-white text-[10px] font-sans uppercase tracking-widest px-4 py-2.5 rounded-none cursor-pointer transition-colors text-center shrink-0 w-full sm:w-auto font-medium"
+                    >
+                      S'informer
+                    </a>
+                  </div>
+
                 </div>
-              </div>
-            ))}
+              );
+            })}
 
             {/* Fallback Beautiful Cinematic Video Frame if no uploads are configured yet */}
             {defileVideos.length === 0 && (
