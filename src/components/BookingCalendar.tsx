@@ -175,6 +175,79 @@ export default function BookingCalendar({ dress, existingBookings, onInitiatePay
     }
   };
 
+  const validateContactInfo = (phone: string, email: string): string | null => {
+    // 1. Email validation
+    const emailClean = email.trim().toLowerCase();
+    
+    // Check format
+    const emailRegex = /^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/;
+    if (!emailRegex.test(emailClean)) {
+      return "Format d'adresse e-mail invalide.";
+    }
+
+    // Block fake/test domains
+    const fakeDomains = [
+      'test.com', 'test.fr', 'example.com', 'example.org', 'example.fr',
+      'fake.com', 'mailinator.com', 'tempmail.com', 'yopmail.com', 'trashmail.com',
+      'domain.com', 'abc.com', 'xyz.com', '123.com', 'nomail.com', 'dummy.com'
+    ];
+    const domain = emailClean.split('@')[1];
+    if (fakeDomains.includes(domain)) {
+      return `Les adresses e-mail de test ou temporaires (comme ${domain}) ne sont pas autorisées.`;
+    }
+
+    // Block keyboard smashes and test usernames
+    const username = emailClean.split('@')[0];
+    const testUsernames = ['test', 'asdf', 'qwerty', 'abc', 'xyz', 'admin', 'user', 'client', '123456'];
+    if (testUsernames.includes(username) || username.length < 3) {
+      return "Veuillez saisir une adresse e-mail valide, évitez les identifiants de test.";
+    }
+
+    // Repetitive chars in email username (e.g. aaaaa@...)
+    const uniqueUsernameChars = new Set(username.split(''));
+    if (uniqueUsernameChars.size <= 2 && username.length > 4) {
+      return "L'adresse e-mail saisie semble être fictive ou répétitive.";
+    }
+
+    // 2. Phone validation
+    const phoneClean = phone.replace(/[\s.-]/g, ''); // remove spaces, dots, dashes
+    
+    // Check format (digits and optional +)
+    const isDigitsOnly = /^\+?[0-9]+$/;
+    if (!isDigitsOnly.test(phoneClean)) {
+      return "Le numéro de téléphone doit contenir uniquement des chiffres.";
+    }
+
+    // Length check
+    if (phoneClean.length < 9 || phoneClean.length > 14) {
+      return "Le numéro de téléphone doit comporter entre 9 et 14 chiffres.";
+    }
+
+    // Check for fake numbers like repeating digits
+    const digitsOnly = phoneClean.replace(/\+/g, '');
+    const uniqueDigits = new Set(digitsOnly.split(''));
+    if (uniqueDigits.size <= 3) {
+      return "Veuillez saisir un numéro de téléphone réel (pas de chiffres répétitifs ou fictifs).";
+    }
+
+    // Check for obvious sequence
+    const sequentialFakes = [
+      '12345678', '87654321', '01234567', '23456789', '0987654321'
+    ];
+    for (const seq of sequentialFakes) {
+      if (digitsOnly.includes(seq)) {
+        return "Les numéros de téléphone séquentiels de test ne sont pas autorisés.";
+      }
+    }
+
+    // Specific Algerian prefix check warning
+    if (digitsOnly.startsWith('0') && !digitsOnly.startsWith('05') && !digitsOnly.startsWith('06') && !digitsOnly.startsWith('07') && !digitsOnly.startsWith('02')) {
+      return "Le numéro de téléphone doit commencer par un préfixe valide (ex: 05, 06, 07 pour les mobiles, ou 026 pour Tizi Ouzou).";
+    }
+
+    return null;
+  };
+
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     setErrorMsg('');
@@ -188,11 +261,18 @@ export default function BookingCalendar({ dress, existingBookings, onInitiatePay
       return;
     }
     if (!customerPhone.trim()) {
-      setErrorMsg('Veuillez saisir un numéro de téléphone valide.');
+      setErrorMsg('Veuillez saisir un numéro de téléphone.');
       return;
     }
     if (!customerEmail.trim()) {
       setErrorMsg('Veuillez saisir une adresse e-mail.');
+      return;
+    }
+
+    // Contact info verification for fake data
+    const contactValidationError = validateContactInfo(customerPhone, customerEmail);
+    if (contactValidationError) {
+      setErrorMsg(contactValidationError);
       return;
     }
 
