@@ -1,7 +1,22 @@
 import React, { useState } from 'react';
-import { Store, Copy, Wallet, ShieldCheck, X, Check, Loader2, Sparkles, Award } from 'lucide-react';
+import { Store, Copy, Wallet, ShieldCheck, X, Check, Loader2, Sparkles, Award, Film } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { Dress, AppSettings, TeamMember } from '../types';
+
+// Helper to format Algerian WhatsApp number into official WhatsApp API international format (without leading zeros or +)
+function formatWhatsAppForApi(phone: string): string {
+  let cleaned = phone.replace(/[^0-9]/g, '');
+  if (cleaned.startsWith('00')) {
+    cleaned = cleaned.substring(2);
+  }
+  if (cleaned.startsWith('0') && cleaned.length === 10) {
+    cleaned = '213' + cleaned.substring(1);
+  }
+  if ((cleaned.startsWith('5') || cleaned.startsWith('6') || cleaned.startsWith('7')) && cleaned.length === 9) {
+    cleaned = '213' + cleaned;
+  }
+  return cleaned;
+}
 
 interface CheckoutModalProps {
   isOpen: boolean;
@@ -277,7 +292,7 @@ export default function CheckoutModal({ isOpen, onClose, dress, bookingDetails, 
               /* Success State */
               (() => {
                 const adminWhatsapp = settings?.notificationWhatsapp || '00213553318195';
-                const cleanWhatsappNumber = adminWhatsapp.replace(/[^0-9]/g, '');
+                const cleanWhatsappNumber = formatWhatsAppForApi(adminWhatsapp);
                 const formattedDate = bookingDetails 
                   ? (bookingDetails.endDate
                     ? `du ${new Date(bookingDetails.date).toLocaleDateString('fr-FR', { day: 'numeric', month: 'long', year: 'numeric' })} au ${new Date(bookingDetails.endDate).toLocaleDateString('fr-FR', { day: 'numeric', month: 'long', year: 'numeric' })}`
@@ -297,7 +312,7 @@ export default function CheckoutModal({ isOpen, onClose, dress, bookingDetails, 
                   (formattedFittingDate ? `• Jour d'Essai (Test) : ${formattedFittingDate}\n` : '') +
                   `• Mode de règlement : ${methodLabel}\n` +
                   `• Acompte Requis : ${dress.depositAmount.toLocaleString()} DZD\n\n` +
-                  `L'alarme de réservation a été déclenchée.`;
+                  `Veuillez valider ma demande de réservation. Merci !`;
                 
                 const whatsappLink = `https://wa.me/${cleanWhatsappNumber}?text=${encodeURIComponent(messageText)}`;
 
@@ -332,7 +347,7 @@ export default function CheckoutModal({ isOpen, onClose, dress, bookingDetails, 
                     
                     <div>
                       <h3 className="text-base font-serif font-light text-bento-text flex items-center justify-center gap-1 uppercase tracking-wide">
-                        Réservation Enregistrée <Sparkles className="w-4 h-4 text-bento-gold animate-pulse" />
+                        Demande Enregistrée <Sparkles className="w-4 h-4 text-bento-gold animate-pulse" />
                       </h3>
                       <p className="text-[11px] text-bento-text/70 mt-0.5 font-sans">
                         {selectedMethod === 'magasin' 
@@ -404,48 +419,49 @@ export default function CheckoutModal({ isOpen, onClose, dress, bookingDetails, 
 
                       {/* ALARME BANNER */}
                       <div className="border-t border-dashed border-bento-gold/20 pt-2 space-y-2 font-sans text-[10px]">
-                        <div className="bg-emerald-50 text-emerald-800 p-2 border border-emerald-100 flex flex-col gap-1">
-                          <p className="font-bold uppercase tracking-wider text-[8.5px] flex items-center gap-1 text-emerald-700">
-                            🚨 Alarme de Réservation Activée :
+                        <div className="bg-amber-50 text-amber-900 p-3 border border-amber-200 flex flex-col gap-1.5 text-left leading-relaxed">
+                          <p className="font-bold uppercase tracking-wider text-[8.5px] flex items-center gap-1 text-amber-800">
+                            🚨 ACTION OBLIGATOIRE POUR VALIDER :
                           </p>
                           <p>
-                            • E-mail d'alerte : <strong className="font-bold">{adminEmail}</strong>
+                            Pour bloquer définitivement votre robe de mariée ou création kabyle auprès de notre boutique <strong>Coup de Cœur (Tizi Ouzou)</strong>, vous devez obligatoirement envoyer l'alerte à notre équipe.
                           </p>
-                          <p>
-                            • WhatsApp d'alerte : <strong className="font-bold">{adminWhatsapp}</strong>
+                          <p className="text-[9px] text-amber-700 font-medium">
+                            Cliquez sur le bouton vert ci-dessous pour transmettre automatiquement les détails de votre réservation par WhatsApp.
                           </p>
-                          {teamWithAlarms.length > 0 && (
-                            <p>
-                              • Équipe : <strong className="font-bold">{teamWithAlarms.map(t => `${t.name} (${t.emailAlarm})`).join(', ')}</strong>
-                            </p>
-                          )}
-                        </div>
-
-                        <div className="flex gap-2 justify-center pt-0.5">
-                          <a
-                            href={whatsappLink}
-                            target="_blank"
-                            referrerPolicy="no-referrer"
-                            className="bg-emerald-600 hover:bg-emerald-700 text-white font-bold uppercase tracking-wider text-[8px] px-2.5 py-1.5 transition-all flex items-center gap-1 cursor-pointer"
-                          >
-                            WhatsApp Alerte Administrateur
-                          </a>
-                          <a
-                            href={emailLink}
-                            className="bg-[#3D3434] hover:bg-black text-white font-bold uppercase tracking-wider text-[8px] px-2.5 py-1.5 transition-all flex items-center gap-1 cursor-pointer"
-                          >
-                            E-mail Alerte Équipe
-                          </a>
                         </div>
                       </div>
                     </div>
 
-                    <button
-                      onClick={handleComplete}
-                      className="w-full bg-bento-dark hover:bg-black text-white font-sans uppercase tracking-widest text-[9px] py-3.5 rounded-none shadow-sm cursor-pointer font-bold transition-colors"
-                    >
-                      Fermer & Terminer la réservation
-                    </button>
+                    <div className="space-y-2.5 w-full pt-1">
+                      {/* Primary WhatsApp Action Button */}
+                      <a
+                        href={whatsappLink}
+                        onClick={handleComplete}
+                        target="_blank"
+                        referrerPolicy="no-referrer"
+                        className="w-full bg-emerald-600 hover:bg-emerald-700 text-white font-sans uppercase tracking-[0.15em] text-[10px] py-4 rounded-none shadow-md transition-all flex items-center justify-center gap-2 cursor-pointer font-bold animate-pulse text-center"
+                      >
+                        <Check className="w-4 h-4" />
+                        Confirmer & Envoyer sur WhatsApp 📲
+                      </a>
+
+                      {/* Secondary Email Action Button */}
+                      <a
+                        href={emailLink}
+                        onClick={handleComplete}
+                        className="w-full bg-[#3D3434] hover:bg-black text-white font-sans uppercase tracking-[0.15em] text-[9.5px] py-3.5 rounded-none transition-all flex items-center justify-center gap-2 cursor-pointer font-bold text-center"
+                      >
+                        Alternative : Confirmer & Envoyer par E-mail 📧
+                      </a>
+
+                      <button
+                        onClick={handleComplete}
+                        className="w-full text-center text-zinc-400 hover:text-zinc-600 font-sans uppercase tracking-widest text-[8.5px] py-2 transition-colors cursor-pointer"
+                      >
+                        Passer cette étape (Fermer sans alerte)
+                      </button>
+                    </div>
                   </div>
                 );
               })()
