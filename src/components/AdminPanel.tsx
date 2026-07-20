@@ -2,10 +2,10 @@ import React, { useState } from 'react';
 import { 
   Lock, Calendar, Sparkles, FolderHeart, Users, HeartHandshake, 
   Trash2, Plus, Edit, Check, X, FileAudio, Image as ImageIcon, 
-  Search, BarChart3, ArrowUpRight, DollarSign, PlusCircle, LogOut, Download
+  Search, BarChart3, ArrowUpRight, DollarSign, PlusCircle, LogOut, Download, Film
 } from 'lucide-react';
 import { motion } from 'motion/react';
-import { Dress, Booking, TeamMember, Testimonial, AppSettings, Category } from '../types';
+import { Dress, Booking, TeamMember, Testimonial, AppSettings, Category, DefileVideo } from '../types';
 
 interface AdminPanelProps {
   dresses: Dress[];
@@ -16,6 +16,8 @@ interface AdminPanelProps {
   setTeam: React.Dispatch<React.SetStateAction<TeamMember[]>>;
   testimonials: Testimonial[];
   setTestimonials: React.Dispatch<React.SetStateAction<Testimonial[]>>;
+  defileVideos: DefileVideo[];
+  setDefileVideos: React.Dispatch<React.SetStateAction<DefileVideo[]>>;
   settings: AppSettings;
   setSettings: React.Dispatch<React.SetStateAction<AppSettings>>;
   onClose: () => void;
@@ -26,6 +28,7 @@ export default function AdminPanel({
   bookings, setBookings,
   team, setTeam,
   testimonials, setTestimonials,
+  defileVideos, setDefileVideos,
   settings, setSettings,
   onClose
 }: AdminPanelProps) {
@@ -34,8 +37,8 @@ export default function AdminPanel({
   const [passwordInput, setPasswordInput] = useState('');
   const [loginError, setLoginError] = useState('');
 
-  // Navigation tabs: 'bookings' | 'dresses' | 'settings' | 'team_testimonials'
-  const [activeTab, setActiveTab] = useState<'bookings' | 'dresses' | 'settings' | 'team_testimonials'>('bookings');
+  // Navigation tabs: 'bookings' | 'dresses' | 'defile_videos' | 'settings' | 'team_testimonials'
+  const [activeTab, setActiveTab] = useState<'bookings' | 'dresses' | 'defile_videos' | 'settings' | 'team_testimonials'>('bookings');
 
   // Search and Filter states
   const [bookingSearch, setBookingSearch] = useState('');
@@ -55,6 +58,53 @@ export default function AdminPanel({
   const [dressImages, setDressImages] = useState<string>('');
   const [dressVideo, setDressVideo] = useState('');
   const [dressAvailable, setDressAvailable] = useState(true);
+
+  // Défilés Haute Couture / Showcase Videos Form States
+  const [isDefileModalOpen, setIsDefileModalOpen] = useState(false);
+  const [editingDefile, setEditingDefile] = useState<DefileVideo | null>(null);
+  const [defileTitle, setDefileTitle] = useState('');
+  const [defileCategory, setDefileCategory] = useState('Robes de mariée');
+  const [defileDescription, setDefileDescription] = useState('');
+  const [defileVideoUrl, setDefileVideoUrl] = useState('');
+  const [defileCoverImage, setDefileCoverImage] = useState('');
+
+  // Image compression utility to avoid LocalStorage quota exceed errors
+  const compressBase64Image = (base64Str: string, maxWidth = 800, maxHeight = 800, quality = 0.7): Promise<string> => {
+    return new Promise((resolve) => {
+      if (!base64Str.startsWith('data:image/')) {
+        resolve(base64Str);
+        return;
+      }
+      const img = new Image();
+      img.src = base64Str;
+      img.onload = () => {
+        let width = img.width;
+        let height = img.height;
+        if (width > maxWidth || height > maxHeight) {
+          if (width > height) {
+            height = Math.round((height * maxWidth) / width);
+            width = maxWidth;
+          } else {
+            width = Math.round((width * maxHeight) / height);
+            height = maxHeight;
+          }
+        }
+        const canvas = document.createElement('canvas');
+        canvas.width = width;
+        canvas.height = height;
+        const ctx = canvas.getContext('2d');
+        if (ctx) {
+          ctx.drawImage(img, 0, 0, width, height);
+          resolve(canvas.toDataURL('image/jpeg', quality));
+        } else {
+          resolve(base64Str);
+        }
+      };
+      img.onerror = () => {
+        resolve(base64Str);
+      };
+    });
+  };
 
   // Team & Testimonials Modal States
   const [isTeamModalOpen, setIsTeamModalOpen] = useState(false);
@@ -199,6 +249,67 @@ export default function AdminPanel({
       const updated = dresses.filter(d => d.id !== id);
       setDresses(updated);
       localStorage.setItem('boutique_dresses', JSON.stringify(updated));
+    }
+  };
+
+  // Défilés / Showcase Videos Handlers
+  const openAddDefile = () => {
+    setEditingDefile(null);
+    setDefileTitle('');
+    setDefileCategory('Robes de mariée');
+    setDefileDescription('');
+    setDefileVideoUrl('');
+    setDefileCoverImage('');
+    setIsDefileModalOpen(true);
+  };
+
+  const openEditDefile = (video: DefileVideo) => {
+    setEditingDefile(video);
+    setDefileTitle(video.title);
+    setDefileCategory(video.category);
+    setDefileDescription(video.description);
+    setDefileVideoUrl(video.videoUrl);
+    setDefileCoverImage(video.coverImage);
+    setIsDefileModalOpen(true);
+  };
+
+  const handleDefileSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    const fallbackImage = 'https://images.unsplash.com/photo-1594552072238-b8a33785b261?auto=format&fit=crop&w=800&q=80';
+    const finalCoverImage = defileCoverImage.trim() || fallbackImage;
+
+    if (editingDefile) {
+      const updated = defileVideos.map(v => v.id === editingDefile.id ? {
+        ...v,
+        title: defileTitle,
+        category: defileCategory,
+        description: defileDescription,
+        videoUrl: defileVideoUrl,
+        coverImage: finalCoverImage
+      } : v);
+      setDefileVideos(updated);
+      localStorage.setItem('boutique_defile_videos', JSON.stringify(updated));
+    } else {
+      const newDefile: DefileVideo = {
+        id: 'defile-' + Date.now(),
+        title: defileTitle,
+        category: defileCategory,
+        description: defileDescription,
+        videoUrl: defileVideoUrl,
+        coverImage: finalCoverImage
+      };
+      const updated = [newDefile, ...defileVideos];
+      setDefileVideos(updated);
+      localStorage.setItem('boutique_defile_videos', JSON.stringify(updated));
+    }
+    setIsDefileModalOpen(false);
+  };
+
+  const deleteDefile = (id: string) => {
+    if (window.confirm('Voulez-vous supprimer cette vidéo de défilé définitivement ?')) {
+      const updated = defileVideos.filter(v => v.id !== id);
+      setDefileVideos(updated);
+      localStorage.setItem('boutique_defile_videos', JSON.stringify(updated));
     }
   };
 
@@ -548,6 +659,16 @@ export default function AdminPanel({
           </button>
 
           <button
+            onClick={() => setActiveTab('defile_videos')}
+            className={`w-full text-left px-4 py-3 rounded-none text-[10px] font-sans font-bold uppercase tracking-wider transition-all flex items-center gap-3 cursor-pointer ${
+              activeTab === 'defile_videos' ? 'bg-bento-gold text-white' : 'text-white/60 hover:bg-bento-gold/15 hover:text-white'
+            }`}
+          >
+            <Film className="w-3.5 h-3.5" />
+            Défilés Haute Couture
+          </button>
+
+          <button
             onClick={() => setActiveTab('team_testimonials')}
             className={`w-full text-left px-4 py-3 rounded-none text-[10px] font-sans font-bold uppercase tracking-wider transition-all flex items-center gap-3 cursor-pointer ${
               activeTab === 'team_testimonials' ? 'bg-bento-gold text-white' : 'text-white/60 hover:bg-bento-gold/15 hover:text-white'
@@ -859,6 +980,94 @@ export default function AdminPanel({
                     </div>
                   </div>
                 ))}
+              </div>
+            </div>
+          )}
+
+          {/* TAB: DEFILE VIDEOS */}
+          {activeTab === 'defile_videos' && (
+            <div className="space-y-6">
+              {/* Controls */}
+              <div className="flex flex-col sm:flex-row gap-4 items-center justify-between">
+                <div>
+                  <h3 className="font-serif font-bold text-zinc-800 text-lg">Défilés Haute Couture</h3>
+                  <p className="text-xs text-zinc-500">Gérez les vidéos de démonstration et de défilés de mode affichées sur le site.</p>
+                </div>
+
+                <button
+                  onClick={openAddDefile}
+                  className="bg-gold-gradient text-white px-5 py-2.5 rounded-xl font-serif text-sm font-semibold flex items-center gap-2 hover:opacity-90 shadow-sm cursor-pointer whitespace-nowrap w-full sm:w-auto justify-center"
+                >
+                  <PlusCircle className="w-4 h-4" />
+                  Ajouter un Défilé / Vidéo
+                </button>
+              </div>
+
+              {/* Grid of Showcase Videos */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
+                {defileVideos.map((v) => (
+                  <div key={v.id} className="bg-white rounded-2xl overflow-hidden border border-zinc-100 shadow-sm flex flex-col hover:shadow-md transition-all relative">
+                    
+                    {/* Video / Thumbnail preview */}
+                    <div className="h-44 relative overflow-hidden bg-zinc-900 group">
+                      {v.videoUrl.startsWith('data:video/') ? (
+                        <video src={v.videoUrl} className="w-full h-full object-cover brightness-90" muted loop playsInline />
+                      ) : (
+                        <img src={v.coverImage} alt={v.title} className="w-full h-full object-cover brightness-90" />
+                      )}
+                      
+                      {/* Category Badge */}
+                      <span className="absolute top-3 right-3 bg-zinc-900/80 text-white text-[10px] uppercase font-bold tracking-wider px-2.5 py-1 rounded">
+                        {v.category}
+                      </span>
+
+                      {/* Video Indicator */}
+                      <div className="absolute inset-0 flex items-center justify-center bg-black/20 group-hover:bg-black/35 transition-colors">
+                        <div className="w-10 h-10 rounded-full bg-white/20 backdrop-blur-md flex items-center justify-center text-white border border-white/30">
+                          <Film className="w-5 h-5 text-white" />
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Details */}
+                    <div className="p-4 flex-1 flex flex-col justify-between space-y-3">
+                      <div className="space-y-1">
+                        <h4 className="font-serif font-bold text-zinc-800 line-clamp-1">{v.title}</h4>
+                        <p className="text-xs text-zinc-500 line-clamp-2 leading-relaxed">{v.description}</p>
+                      </div>
+
+                      {/* Video source URL preview */}
+                      <div className="bg-zinc-50 p-2 rounded-lg border border-zinc-100 text-[10px] text-zinc-400 font-mono truncate">
+                        URL : {v.videoUrl.startsWith('data:') ? 'Fichier Téléversé (Base64)' : v.videoUrl}
+                      </div>
+
+                      {/* Actions */}
+                      <div className="flex gap-2 pt-2 border-t border-zinc-100/50">
+                        <button
+                          onClick={() => openEditDefile(v)}
+                          className="flex-1 py-1.5 rounded-lg text-xs font-semibold border border-zinc-200 text-zinc-700 hover:bg-zinc-50 flex items-center justify-center gap-1.5 cursor-pointer"
+                        >
+                          <Edit className="w-3.5 h-3.5" /> Modifier
+                        </button>
+                        <button
+                          onClick={() => deleteDefile(v.id)}
+                          className="p-1.5 rounded-lg border border-rose-100 text-rose-500 hover:bg-rose-50 flex items-center justify-center cursor-pointer"
+                          title="Supprimer la vidéo de défilé"
+                        >
+                          <Trash2 className="w-3.5 h-3.5" />
+                        </button>
+                      </div>
+                    </div>
+
+                  </div>
+                ))}
+
+                {defileVideos.length === 0 && (
+                  <div className="col-span-full text-center py-12 text-zinc-400 space-y-2">
+                    <Film className="w-8 h-8 mx-auto text-zinc-300" />
+                    <p className="text-sm">Aucune vidéo de défilé configurée.</p>
+                  </div>
+                )}
               </div>
             </div>
           )}
@@ -1293,19 +1502,20 @@ export default function AdminPanel({
                         onChange={(e) => {
                           const files = e.target.files;
                           if (files && files.length > 0) {
-                            const newBase64s: string[] = [];
+                            const compressedBase64s: string[] = [];
                             let loadedCount = 0;
                             Array.from(files).forEach((file) => {
                               const reader = new FileReader();
-                              reader.onload = (event) => {
+                              reader.onload = async (event) => {
                                 if (event.target?.result) {
-                                  newBase64s.push(event.target.result as string);
+                                  const compressed = await compressBase64Image(event.target.result as string, 800, 800, 0.7);
+                                  compressedBase64s.push(compressed);
                                 }
                                 loadedCount++;
                                 if (loadedCount === files.length) {
                                   const currentImages = dressImages.trim();
                                   const separator = currentImages ? ', ' : '';
-                                  setDressImages(currentImages + separator + newBase64s.join(', '));
+                                  setDressImages(currentImages + separator + compressedBase64s.join(', '));
                                 }
                               };
                               reader.readAsDataURL(file as any);
@@ -1317,7 +1527,7 @@ export default function AdminPanel({
                   </div>
                 </div>
                 <span className="text-[10px] text-zinc-400 mt-1 block">
-                  Collez des liens d'images séparés par des virgules ou importez des fichiers directement de votre appareil.
+                  Collez des liens d'images séparés par des virgules ou importez des fichiers directement de votre appareil (qui seront compressés pour économiser de l'espace).
                 </span>
               </div>
 
@@ -1341,6 +1551,10 @@ export default function AdminPanel({
                         onChange={(e) => {
                           const file = e.target.files?.[0];
                           if (file) {
+                            if (file.size > 2 * 1024 * 1024) {
+                              alert(`⚠️ Ce fichier vidéo est trop volumineux (${(file.size / (1024 * 1024)).toFixed(1)} Mo). Pour éviter de saturer l'espace de stockage, veuillez choisir une vidéo de moins de 2 Mo ou utiliser un lien URL direct.`);
+                              return;
+                            }
                             const reader = new FileReader();
                             reader.onload = (event) => {
                               if (event.target?.result) {
@@ -1582,6 +1796,158 @@ export default function AdminPanel({
                   className="flex-1 py-2 bg-gold-gradient text-white rounded-lg cursor-pointer text-xs font-bold"
                 >
                   Valider
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* MODAL: ADD/EDIT DEFILE VIDEO */}
+      {isDefileModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-zinc-950/60 backdrop-blur-xs">
+          <div className="w-full max-w-lg bg-white rounded-2xl shadow-xl overflow-hidden max-h-[90vh] flex flex-col">
+            <div className="bg-zinc-900 text-white p-4 flex justify-between items-center shrink-0">
+              <h3 className="font-serif font-semibold">{editingDefile ? 'Modifier le Défilé' : 'Ajouter un Défilé'}</h3>
+              <button onClick={() => setIsDefileModalOpen(false)} className="text-zinc-400 hover:text-white cursor-pointer">
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <form onSubmit={handleDefileSubmit} className="p-6 space-y-4 text-sm overflow-y-auto flex-1">
+              <div>
+                <label className="block text-xs font-bold text-zinc-500 uppercase mb-1">Titre du Défilé / Vidéo</label>
+                <input
+                  type="text"
+                  required
+                  value={defileTitle}
+                  onChange={(e) => setDefileTitle(e.target.value)}
+                  className="w-full p-2.5 border rounded-lg focus:ring-1 focus:ring-bento-gold focus:outline-none"
+                  placeholder="Collection Printemps 2026 - Robe Traditionnelle Kabyle"
+                />
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-xs font-bold text-zinc-500 uppercase mb-1">Catégorie</label>
+                  <select
+                    value={defileCategory}
+                    onChange={(e) => setDefileCategory(e.target.value)}
+                    className="w-full p-2.5 border rounded-lg bg-white focus:ring-1 focus:ring-bento-gold focus:outline-none"
+                  >
+                    <option value="Robes de mariée">Robes de mariée</option>
+                    <option value="Robes kabyles">Robes kabyles</option>
+                    <option value="Robes berbères">Robes berbères</option>
+                    <option value="Collection Signature">Collection Signature</option>
+                    <option value="Défilés Haute Couture">Défilés Haute Couture</option>
+                  </select>
+                </div>
+
+                <div>
+                  <label className="block text-xs font-bold text-zinc-500 uppercase mb-1">Description Courte</label>
+                  <input
+                    type="text"
+                    required
+                    value={defileDescription}
+                    onChange={(e) => setDefileDescription(e.target.value)}
+                    className="w-full p-2.5 border rounded-lg focus:ring-1 focus:ring-bento-gold focus:outline-none"
+                    placeholder="Sublime mouvement de soie kabylo-moderne..."
+                  />
+                </div>
+              </div>
+
+              {/* Cover Image */}
+              <div>
+                <label className="block text-xs font-bold text-zinc-500 uppercase mb-1">Image de Couverture (URL ou Téléversement)</label>
+                <div className="flex gap-2">
+                  <input
+                    type="text"
+                    value={defileCoverImage}
+                    onChange={(e) => setDefileCoverImage(e.target.value)}
+                    className="flex-1 p-2.5 border rounded-lg font-mono text-xs focus:ring-1 focus:ring-bento-gold focus:outline-none"
+                    placeholder="https://images.unsplash.com/..."
+                  />
+                  <label className="bg-zinc-800 hover:bg-zinc-900 text-white px-3.5 py-2.5 text-xs font-bold flex items-center justify-center cursor-pointer select-none rounded-lg shrink-0">
+                    Téléverser
+                    <input
+                      type="file"
+                      accept="image/*"
+                      className="hidden"
+                      onChange={(e) => {
+                        const file = e.target.files?.[0];
+                        if (file) {
+                          const reader = new FileReader();
+                          reader.onload = async (event) => {
+                            if (event.target?.result) {
+                              const compressed = await compressBase64Image(event.target.result as string, 800, 800, 0.7);
+                              setDefileCoverImage(compressed);
+                            }
+                          };
+                          reader.readAsDataURL(file);
+                        }
+                      }}
+                    />
+                  </label>
+                </div>
+                <span className="text-[10px] text-zinc-400 mt-1 block">
+                  Sélectionnez une image de couverture locale (qui sera compressée) ou collez une adresse URL.
+                </span>
+              </div>
+
+              {/* Video url or file */}
+              <div>
+                <label className="block text-xs font-bold text-zinc-500 uppercase mb-1 font-sans">Vidéo du Défilé (URL MP4 ou Téléversement)</label>
+                <div className="flex gap-2">
+                  <input
+                    type="text"
+                    value={defileVideoUrl}
+                    onChange={(e) => setDefileVideoUrl(e.target.value)}
+                    className="flex-1 p-2.5 border rounded-lg font-mono text-xs focus:ring-1 focus:ring-bento-gold focus:outline-none"
+                    placeholder="https://assets.mixkit.co/..."
+                  />
+                  <label className="bg-zinc-800 hover:bg-zinc-900 text-white px-3.5 py-2.5 text-xs font-bold flex items-center justify-center cursor-pointer select-none rounded-lg shrink-0">
+                    Téléverser MP4
+                    <input
+                      type="file"
+                      accept="video/*"
+                      className="hidden"
+                      onChange={(e) => {
+                        const file = e.target.files?.[0];
+                        if (file) {
+                          if (file.size > 2 * 1024 * 1024) {
+                            alert(`⚠️ Ce fichier vidéo est trop volumineux (${(file.size / (1024 * 1024)).toFixed(1)} Mo). Pour préserver l'espace de stockage, veuillez choisir une vidéo de moins de 2 Mo ou utiliser un lien URL direct.`);
+                            return;
+                          }
+                          const reader = new FileReader();
+                          reader.onload = (event) => {
+                            if (event.target?.result) {
+                              setDefileVideoUrl(event.target.result as string);
+                            }
+                          };
+                          reader.readAsDataURL(file);
+                        }
+                      }}
+                    />
+                  </label>
+                </div>
+                <span className="text-[10px] text-zinc-400 mt-1 block">
+                  Sélectionnez un fichier MP4 local (inférieur à 2 Mo) ou collez une adresse de vidéo MP4 directe.
+                </span>
+              </div>
+
+              <div className="pt-4 border-t flex gap-3 shrink-0">
+                <button
+                  type="button"
+                  onClick={() => setIsDefileModalOpen(false)}
+                  className="flex-1 py-2.5 bg-zinc-100 hover:bg-zinc-200 rounded-lg text-zinc-700 font-bold transition-colors cursor-pointer text-xs"
+                >
+                  Annuler
+                </button>
+                <button
+                  type="submit"
+                  className="flex-1 py-2.5 bg-gold-gradient text-white rounded-lg font-serif font-bold hover:opacity-90 transition-opacity shadow cursor-pointer text-xs"
+                >
+                  {editingDefile ? 'Enregistrer les modifications' : 'Ajouter le défilé'}
                 </button>
               </div>
             </form>

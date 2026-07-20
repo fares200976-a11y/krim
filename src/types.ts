@@ -62,3 +62,13 @@ export interface AppSettings {
   notificationEmail?: string; // Email d'alarme (karimchabni395@gmail.com)
   notificationWhatsapp?: string; // WhatsApp d'alarme (00213553318195)
 }
+
+export interface DefileVideo {
+  id: string;
+  title: string;
+  category: string;
+  description: string;
+  videoUrl: string;
+  coverImage: string;
+}
+

@@ -7,8 +7,8 @@ import {
 import { motion, AnimatePresence } from 'motion/react';
 
 // Data and types
-import { Category, Dress, Booking, TeamMember, Testimonial, AppSettings } from './types';
-import { INITIAL_DRESSES, INITIAL_TEAM, INITIAL_TESTIMONIALS, DEFAULT_SETTINGS } from './initialData';
+import { Category, Dress, Booking, TeamMember, Testimonial, AppSettings, DefileVideo } from './types';
+import { INITIAL_DRESSES, INITIAL_TEAM, INITIAL_TESTIMONIALS, DEFAULT_SETTINGS, INITIAL_DEFILES } from './initialData';
 
 // Components
 import AudioPlayer from './components/AudioPlayer';
@@ -22,6 +22,7 @@ export default function App() {
   const [bookings, setBookings] = useState<Booking[]>([]);
   const [team, setTeam] = useState<TeamMember[]>([]);
   const [testimonials, setTestimonials] = useState<Testimonial[]>([]);
+  const [defileVideos, setDefileVideos] = useState<DefileVideo[]>([]);
   const [settings, setSettings] = useState<AppSettings>(DEFAULT_SETTINGS);
 
   // Initialize data
@@ -103,6 +104,15 @@ export default function App() {
     } else {
       setTestimonials(INITIAL_TESTIMONIALS);
       localStorage.setItem('boutique_testimonials', JSON.stringify(INITIAL_TESTIMONIALS));
+    }
+
+    // Defiles / Videos
+    const localDefileVideos = localStorage.getItem('boutique_defile_videos');
+    if (localDefileVideos) {
+      setDefileVideos(JSON.parse(localDefileVideos));
+    } else {
+      setDefileVideos(INITIAL_DEFILES);
+      localStorage.setItem('boutique_defile_videos', JSON.stringify(INITIAL_DEFILES));
     }
   }, []);
 
@@ -650,15 +660,15 @@ export default function App() {
           </div>
 
           {/* Videos Showcase Grid */}
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-8 lg:gap-12">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 md:gap-8 lg:gap-12">
             
-            {/* Custom Interactive Main Video (If any dresses have videos) */}
-            {videoShowcaseDresses.slice(0, 2).map((d) => (
-              <div key={d.id} className="space-y-4">
+            {/* Custom Interactive Main Video (Defile Videos managed by Admin) */}
+            {defileVideos.map((v) => (
+              <div key={v.id} className="space-y-2 md:space-y-4">
                 <div className="relative aspect-video rounded-md overflow-hidden shadow-2xl bg-bento-dark group border border-bento-gold/25">
-                  {playingVideoId === d.id ? (
+                  {playingVideoId === v.id ? (
                     <video
-                      src={d.videoUrl}
+                      src={v.videoUrl}
                       controls
                       autoPlay
                       loop
@@ -666,33 +676,33 @@ export default function App() {
                     />
                   ) : (
                     <>
-                      <img src={d.images[0]} alt={d.name} className="w-full h-full object-cover brightness-75" />
+                      <img src={v.coverImage} alt={v.title} className="w-full h-full object-cover brightness-75 transition-transform duration-500 group-hover:scale-105" />
                       
                       {/* Play Button Overlay */}
                       <button
-                        onClick={() => setPlayingVideoId(d.id)}
+                        onClick={() => setPlayingVideoId(v.id)}
                         className="absolute inset-0 flex items-center justify-center bg-black/30 group-hover:bg-black/45 transition-colors cursor-pointer"
                       >
-                        <div className="w-16 h-16 rounded-full bg-gold-gradient flex items-center justify-center text-white shadow-xl hover:scale-105 transition-transform">
-                          <Play className="w-6 h-6 fill-current text-white ml-1" />
+                        <div className="w-12 h-12 md:w-16 md:h-16 rounded-full bg-gold-gradient flex items-center justify-center text-white shadow-xl hover:scale-105 transition-transform">
+                          <Play className="w-4 h-4 md:w-6 md:h-6 fill-current text-white ml-1" />
                         </div>
                       </button>
 
                       {/* Info Badge */}
-                      <div className="absolute bottom-4 left-4 right-4 bg-bento-dark/95 backdrop-blur-md p-4 rounded-none flex items-center justify-between border border-bento-gold/25">
-                        <div className="space-y-0.5">
-                          <p className="text-[9px] uppercase tracking-widest font-sans font-bold text-bento-gold">{d.category}</p>
-                          <h4 className="font-serif font-light text-sm text-white uppercase tracking-wide">{d.name}</h4>
+                      <div className="absolute bottom-2 left-2 right-2 md:bottom-4 md:left-4 md:right-4 bg-bento-dark/95 backdrop-blur-md p-3 md:p-4 rounded-none flex flex-col sm:flex-row sm:items-center justify-between border border-bento-gold/25 gap-2">
+                        <div className="space-y-0.5 min-w-0">
+                          <p className="text-[8px] md:text-[9px] uppercase tracking-widest font-sans font-bold text-bento-gold">{v.category}</p>
+                          <h4 className="font-serif font-medium text-xs md:text-sm text-white uppercase tracking-wide truncate">{v.title}</h4>
+                          <p className="text-[9px] md:text-[10px] text-white/60 font-sans line-clamp-1">{v.description}</p>
                         </div>
-                        <button
-                          onClick={() => {
-                            setActiveDress(d);
-                            setIsDressOpen(true);
-                          }}
-                          className="bg-bento-gold hover:bg-bento-gold-dark text-white text-[10px] font-sans uppercase tracking-widest px-4 py-2 rounded-none cursor-pointer transition-colors"
+                        <a
+                          href={`https://wa.me/213550123456?text=Bonjour%20Boutique%20Coup%20de%20C%C5%93ur,%20je%20suis%20int%C3%A9ress%C3%A9(e)%20par%20la%20tenue%20vue%20sur%20le%20d%C3%A9fil%C3%A9%20%22${encodeURIComponent(v.title)}%22.`}
+                          target="_blank"
+                          referrerPolicy="no-referrer"
+                          className="bg-bento-gold hover:bg-bento-gold-dark text-white text-[9px] md:text-[10px] font-sans uppercase tracking-widest px-3 py-1.5 md:px-4 md:py-2 rounded-none cursor-pointer transition-colors text-center shrink-0"
                         >
-                          Louer
-                        </button>
+                          S'informer
+                        </a>
                       </div>
                     </>
                   )}
@@ -701,7 +711,7 @@ export default function App() {
             ))}
 
             {/* Fallback Beautiful Cinematic Video Frame if no uploads are configured yet */}
-            {videoShowcaseDresses.length === 0 && (
+            {defileVideos.length === 0 && (
               <div className="md:col-span-2 text-center py-12 text-zinc-500 space-y-2">
                 <Film className="w-10 h-10 mx-auto text-bento-gold/30" />
                 <p className="text-sm font-sans">Aucune vidéo de démonstration n'a été mise en ligne par l'administrateur.</p>
@@ -1053,6 +1063,8 @@ export default function App() {
           setTeam={setTeam}
           testimonials={testimonials}
           setTestimonials={setTestimonials}
+          defileVideos={defileVideos}
+          setDefileVideos={setDefileVideos}
           settings={settings}
           setSettings={setSettings}
           onClose={() => setIsAdminOpen(false)}
