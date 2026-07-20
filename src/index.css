@@ -1,0 +1,61 @@
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Playfair+Display:ital,wght@0,400;0,500;0,600;0,700;1,400&family=JetBrains+Mono:wght@400;500&display=swap');
+@import "tailwindcss";
+
+@theme {
+  --font-sans: "Inter", ui-sans-serif, system-ui, sans-serif;
+  --font-serif: "Playfair Display", Georgia, Cambria, "Times New Roman", Times, serif;
+  --font-mono: "JetBrains Mono", ui-monospace, SFMono-Regular, monospace;
+  
+  --color-bento-bg: #FAF7F5;
+  --color-bento-card: #FFFFFF;
+  --color-bento-text: #3D3434;
+  --color-bento-gold: #C5A059;
+  --color-bento-gold-dark: #A68641;
+  --color-bento-rose: #FDF2F4;
+  --color-bento-dark: #1A1A1A;
+  
+  --color-gold-50: #FAF6EB;
+  --color-gold-100: #F3E9CD;
+  --color-gold-200: #E7D29E;
+  --color-gold-300: #DBBC6F;
+  --color-gold-400: #C5A059;
+  --color-gold-500: #C5A059;
+  --color-gold-600: #A68641;
+  --color-gold-700: #824B12;
+  --color-gold-800: #62340E;
+  --color-gold-900: #4B240B;
+}
+
+/* Custom romantic luxury gradients and animations */
+.text-gold-gradient {
+  background: linear-gradient(135deg, #E6C653 0%, #C5A059 50%, #E6C653 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+}
+
+.bg-gold-gradient {
+  background: linear-gradient(135deg, #E6C653 0%, #C5A059 100%);
+}
+
+.bg-rose-gradient {
+  background: linear-gradient(135deg, #FAF7F5 0%, #FDF2F4 100%);
+}
+
+.gold-border-glow {
+  box-shadow: 0 0 15px rgba(197, 160, 89, 0.15);
+}
+
+/* Scrollbar design */
+::-webkit-scrollbar {
+  width: 6px;
+}
+::-webkit-scrollbar-track {
+  background: #FAF7F5;
+}
+::-webkit-scrollbar-thumb {
+  background: #C5A059;
+  border-radius: 3px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: #A68641;
+}

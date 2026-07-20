@@ -1,0 +1,6 @@
+{
+  "name": "Boutique Coup de Cœur",
+  "description": "Prestigieuse boutique de location de robes de mariée, robes kabyles, caftans et robes de soirée à Tizi Ouzou. Prise de rendez-vous, galerie interactive et espace d'administration.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
