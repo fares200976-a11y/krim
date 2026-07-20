@@ -12,6 +12,7 @@ interface CheckoutModalProps {
     customerPhone: string;
     customerEmail: string;
     date: string;
+    endDate?: string;
     fittingDate?: string;
     size: string;
     notes: string;
@@ -148,9 +149,12 @@ export default function CheckoutModal({ isOpen, onClose, dress, bookingDetails, 
                     <span className="font-semibold text-bento-gold bg-white px-2 py-0.5 rounded-none border border-bento-gold/15">{bookingDetails.size}</span>
                   </div>
                   <div className="flex justify-between">
-                    <span className="text-bento-text/60">Date réservée :</span>
+                    <span className="text-bento-text/60">Dates réservées :</span>
                     <span className="font-semibold text-bento-text">
-                      {new Date(bookingDetails.date).toLocaleDateString('fr-FR', { day: 'numeric', month: 'long', year: 'numeric' })}
+                      {bookingDetails.endDate
+                        ? `Du ${new Date(bookingDetails.date).toLocaleDateString('fr-FR', { day: 'numeric', month: 'short' })} au ${new Date(bookingDetails.endDate).toLocaleDateString('fr-FR', { day: 'numeric', month: 'long', year: 'numeric' })}`
+                        : new Date(bookingDetails.date).toLocaleDateString('fr-FR', { day: 'numeric', month: 'long', year: 'numeric' })
+                      }
                     </span>
                   </div>
                   {bookingDetails.fittingDate && (
@@ -275,7 +279,12 @@ export default function CheckoutModal({ isOpen, onClose, dress, bookingDetails, 
               (() => {
                 const adminWhatsapp = settings?.notificationWhatsapp || '00213553318195';
                 const cleanWhatsappNumber = adminWhatsapp.replace(/[^0-9]/g, '');
-                const formattedDate = bookingDetails ? new Date(bookingDetails.date).toLocaleDateString('fr-FR', { day: 'numeric', month: 'long', year: 'numeric' }) : '';
+                const formattedDate = bookingDetails 
+                  ? (bookingDetails.endDate
+                    ? `du ${new Date(bookingDetails.date).toLocaleDateString('fr-FR', { day: 'numeric', month: 'long', year: 'numeric' })} au ${new Date(bookingDetails.endDate).toLocaleDateString('fr-FR', { day: 'numeric', month: 'long', year: 'numeric' })}`
+                    : `le ${new Date(bookingDetails.date).toLocaleDateString('fr-FR', { day: 'numeric', month: 'long', year: 'numeric' })}`
+                  )
+                  : '';
                 const formattedFittingDate = bookingDetails?.fittingDate ? new Date(bookingDetails.fittingDate).toLocaleDateString('fr-FR', { day: 'numeric', month: 'long', year: 'numeric' }) : '';
                 
                 const messageText = `🔔 NOUVELLE RÉSERVATION - Coup de Cœur Tizi Ouzou\n\n` +

@@ -11,6 +11,7 @@ interface BookingCalendarProps {
     customerPhone: string;
     customerEmail: string;
     date: string;
+    endDate?: string;
     fittingDate?: string;
     size: string;
     notes: string;
@@ -23,6 +24,7 @@ export default function BookingCalendar({ dress, existingBookings, onInitiatePay
   const [currentYear, setCurrentYear] = useState(today.getFullYear());
   const [currentMonth, setCurrentMonth] = useState(today.getMonth()); // 0-indexed
   const [selectedDateStr, setSelectedDateStr] = useState<string>('');
+  const [selectedEndDateStr, setSelectedEndDateStr] = useState<string>('');
   const [selectedFittingDateStr, setSelectedFittingDateStr] = useState<string>('');
   const [dateSelectionMode, setDateSelectionMode] = useState<'event' | 'fitting'>('event');
   
@@ -75,9 +77,39 @@ export default function BookingCalendar({ dress, existingBookings, onInitiatePay
   // Check if a date is already booked for this specific dress
   const isDateAlreadyBooked = (day: number) => {
     const dateStr = formatDateString(day);
-    return existingBookings.some(
-      (b) => b.dressId === dress.id && b.date === dateStr && b.status === 'confirmed'
-    );
+    return existingBookings.some((b) => {
+      if (b.dressId !== dress.id || b.status === 'cancelled') return false;
+      if (b.endDate) {
+        return dateStr >= b.date && dateStr <= b.endDate;
+      }
+      return b.date === dateStr;
+    });
+  };
+
+  const isRangeValid = (start: string, end: string) => {
+    const startDate = new Date(start);
+    const endDate = new Date(end);
+    
+    // Iterate day by day from start to end
+    const current = new Date(startDate);
+    while (current <= endDate) {
+      const year = current.getFullYear();
+      const monthStr = String(current.getMonth() + 1).padStart(2, '0');
+      const dayStr = String(current.getDate()).padStart(2, '0');
+      const dateStr = `${year}-${monthStr}-${dayStr}`;
+      
+      const isBooked = existingBookings.some((b) => {
+        if (b.dressId !== dress.id || b.status === 'cancelled') return false;
+        if (b.endDate) {
+          return dateStr >= b.date && dateStr <= b.endDate;
+        }
+        return b.date === dateStr;
+      });
+      
+      if (isBooked) return false;
+      current.setDate(current.getDate() + 1);
+    }
+    return true;
   };
 
   const handleDateClick = (day: number) => {
@@ -89,7 +121,28 @@ export default function BookingCalendar({ dress, existingBookings, onInitiatePay
         setErrorMsg('Cette date de location est déjà réservée pour cette tenue.');
         return;
       }
-      setSelectedDateStr(dateStr);
+
+      if (!selectedDateStr || selectedEndDateStr) {
+        // Start date selection or reset range
+        setSelectedDateStr(dateStr);
+        setSelectedEndDateStr('');
+      } else {
+        // We have start date, setting end date
+        if (dateStr < selectedDateStr) {
+          setSelectedDateStr(dateStr);
+          setSelectedEndDateStr('');
+        } else if (dateStr === selectedDateStr) {
+          setSelectedEndDateStr('');
+        } else {
+          if (isRangeValid(selectedDateStr, dateStr)) {
+            setSelectedEndDateStr(dateStr);
+          } else {
+            setErrorMsg("La plage de dates sélectionnée contient des jours déjà réservés.");
+            setSelectedDateStr(dateStr);
+            setSelectedEndDateStr('');
+          }
+        }
+      }
     } else {
       setSelectedFittingDateStr(dateStr);
     }
@@ -149,6 +202,7 @@ export default function BookingCalendar({ dress, existingBookings, onInitiatePay
       customerPhone,
       customerEmail,
       date: selectedDateStr,
+      endDate: selectedEndDateStr || undefined,
       fittingDate: selectedFittingDateStr || undefined,
       size: selectedSize,
       notes
@@ -167,15 +221,22 @@ export default function BookingCalendar({ dress, existingBookings, onInitiatePay
     const dateStr = formatDateString(day);
     const isPast = isDateInPast(day);
     const isBooked = isDateAlreadyBooked(day);
-    const isSelectedEvent = selectedDateStr === dateStr;
+    
+    // Range selection states
+    const isSelectedEventStart = selectedDateStr === dateStr;
+    const isSelectedEventEnd = selectedEndDateStr === dateStr;
+    const isInSelectedRange = selectedEndDateStr && (dateStr > selectedDateStr && dateStr < selectedEndDateStr);
+    const isSelectedEvent = isSelectedEventStart || isSelectedEventEnd || isInSelectedRange;
     const isSelectedFitting = selectedFittingDateStr === dateStr;
 
     let cellClass = "p-2 text-center text-sm rounded-none relative cursor-pointer transition-all duration-200 ";
     
     if (isPast) {
       cellClass += "text-bento-text/25 cursor-not-allowed bg-bento-bg/50";
-    } else if (isSelectedEvent) {
+    } else if (isSelectedEventStart || isSelectedEventEnd) {
       cellClass += "bg-bento-gold text-white font-bold shadow-xs scale-100";
+    } else if (isInSelectedRange) {
+      cellClass += "bg-bento-gold/20 text-bento-text font-semibold border-y border-bento-gold/20";
     } else if (isSelectedFitting) {
       cellClass += "bg-emerald-600 text-white font-bold shadow-xs scale-100";
     } else if (isBooked) {
@@ -228,7 +289,10 @@ export default function BookingCalendar({ dress, existingBookings, onInitiatePay
               </span>
               <span className="text-xs font-semibold text-bento-text mt-0.5">
                 {selectedDateStr 
-                  ? new Date(selectedDateStr).toLocaleDateString('fr-FR', { day: 'numeric', month: 'long', year: 'numeric' })
+                  ? (selectedEndDateStr 
+                    ? `Du ${new Date(selectedDateStr).toLocaleDateString('fr-FR', { day: 'numeric', month: 'short' })} au ${new Date(selectedEndDateStr).toLocaleDateString('fr-FR', { day: 'numeric', month: 'long', year: 'numeric' })}`
+                    : new Date(selectedDateStr).toLocaleDateString('fr-FR', { day: 'numeric', month: 'long', year: 'numeric' })
+                  )
                   : 'Cliquez pour choisir'
                 }
               </span>

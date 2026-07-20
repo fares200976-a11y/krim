@@ -24,6 +24,7 @@ export interface Booking {
   customerPhone: string;
   customerEmail: string;
   date: string; // ISO String (YYYY-MM-DD)
+  endDate?: string; // ISO String pour fin de location (YYYY-MM-DD)
   fittingDate?: string; // Date d'essai / test (YYYY-MM-DD)
   size: string;
   status: BookingStatus;

@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { 
   Heart, Phone, MapPin, Instagram, Play, Pause, ChevronLeft, ChevronRight, 
   Sparkles, Calendar, MessageCircle, Star, ShieldCheck, Mail, Lock, 
@@ -159,6 +159,7 @@ export default function App() {
     customerPhone: string;
     customerEmail: string;
     date: string;
+    endDate?: string;
     fittingDate?: string;
     size: string;
     notes: string;
@@ -168,6 +169,18 @@ export default function App() {
 
   // --- Active Video Player in Showcase ---
   const [playingVideoId, setPlayingVideoId] = useState<string | null>(null);
+
+  // --- Mobile Scrollable Dress List Ref & Helpers ---
+  const scrollContainerRef = useRef<HTMLDivElement>(null);
+  const scrollDresses = (direction: 'left' | 'right') => {
+    if (scrollContainerRef.current) {
+      const scrollAmount = window.innerWidth * 0.8;
+      scrollContainerRef.current.scrollBy({
+        left: direction === 'left' ? -scrollAmount : scrollAmount,
+        behavior: 'smooth'
+      });
+    }
+  };
 
   // --- Smooth Scroll helper ---
   const scrollToSection = (id: string) => {
@@ -184,6 +197,7 @@ export default function App() {
     customerPhone: string;
     customerEmail: string;
     date: string;
+    endDate?: string;
     fittingDate?: string;
     size: string;
     notes: string;
@@ -205,6 +219,7 @@ export default function App() {
       customerPhone: checkoutBookingDetails.customerPhone,
       customerEmail: checkoutBookingDetails.customerEmail,
       date: checkoutBookingDetails.date,
+      endDate: checkoutBookingDetails.endDate,
       fittingDate: checkoutBookingDetails.fittingDate,
       size: checkoutBookingDetails.size,
       status: 'confirmed', // Immediate confirmation on secure online payment
@@ -225,10 +240,14 @@ export default function App() {
     setActiveDress(null);
     setCheckoutBookingDetails(null);
 
+    const dateRangeStr = newBooking.endDate
+      ? `du ${new Date(newBooking.date).toLocaleDateString('fr-FR')} au ${new Date(newBooking.endDate).toLocaleDateString('fr-FR')}`
+      : `pour le ${new Date(newBooking.date).toLocaleDateString('fr-FR')}`;
+
     const fittingMessage = newBooking.fittingDate 
       ? ` et votre séance d'essai/test est planifiée pour le ${new Date(newBooking.fittingDate).toLocaleDateString('fr-FR')}`
       : '';
-    alert(`Félicitations ! Votre réservation pour le ${new Date(newBooking.date).toLocaleDateString('fr-FR')} a été confirmée avec succès${fittingMessage}. Notre équipe vous attend à la boutique de Tizi Ouzou !`);
+    alert(`Félicitations ! Votre réservation ${dateRangeStr} a été confirmée avec succès${fittingMessage}. Notre équipe vous attend à la boutique de Tizi Ouzou !`);
   };
 
   // --- Filter Dresses ---
@@ -510,71 +529,102 @@ export default function App() {
             <p className="text-sm font-sans">Aucune tenue n'est présente dans cette catégorie pour le moment.</p>
           </div>
         ) : (
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
-            {displayedDresses.map((dress, index) => (
-              <motion.div
-                key={dress.id}
-                layoutId={`dress-card-${dress.id}`}
-                initial={{ opacity: 0, y: 50 }}
-                whileInView={{ opacity: 1, y: 0 }}
-                viewport={{ once: true, margin: "-80px" }}
-                transition={{ 
-                  duration: 0.8, 
-                  ease: [0.16, 1, 0.3, 1], // Luxurious custom cubic-bezier
-                  delay: (index % 4) * 0.1 // Elegant staggered animation based on column index
-                }}
-                onClick={() => {
-                  setActiveDress(dress);
-                  setIsDressOpen(true);
-                }}
-                className="bg-white rounded-md overflow-hidden border border-bento-gold/20 shadow-sm hover:shadow-md transition-all duration-300 group cursor-pointer flex flex-col justify-between"
-              >
-                {/* Media frame */}
-                <div className="h-72 overflow-hidden relative bg-bento-bg">
-                  <img
-                    src={dress.images[0]}
-                    alt={dress.name}
-                    className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105"
-                  />
-                  {/* Category overlay */}
-                  <span className="absolute top-4 left-4 bg-bento-dark/90 text-white text-[8px] uppercase font-sans tracking-widest px-3 py-1 rounded-none border border-bento-gold/30">
-                    {dress.category}
-                  </span>
-                  
-                  {/* Quick-View hover panel */}
-                  <div className="absolute inset-0 bg-bento-dark/30 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
-                    <span className="bg-white text-bento-text text-[9px] font-sans uppercase tracking-widest px-4 py-2.5 rounded-none border border-bento-gold/25 shadow-lg transform translate-y-3 group-hover:translate-y-0 transition-transform flex items-center gap-1.5">
-                      <Eye className="w-3.5 h-3.5 text-bento-gold" /> Détails & Réservation
+          <div className="relative">
+            {/* Quick-action navigation arrows for mobile swiping helper */}
+            {displayedDresses.length > 1 && (
+              <div className="flex sm:hidden justify-end gap-2 mb-4 px-1">
+                <button 
+                  onClick={() => scrollDresses('left')}
+                  className="w-9 h-9 flex items-center justify-center bg-white border border-bento-gold/30 text-bento-gold active:bg-bento-gold active:text-white transition-all shadow-xs rounded-full"
+                  title="Précédent"
+                >
+                  <ChevronLeft className="w-4 h-4" />
+                </button>
+                <button 
+                  onClick={() => scrollDresses('right')}
+                  className="w-9 h-9 flex items-center justify-center bg-white border border-bento-gold/30 text-bento-gold active:bg-bento-gold active:text-white transition-all shadow-xs rounded-full"
+                  title="Suivant"
+                >
+                  <ChevronRight className="w-4 h-4" />
+                </button>
+              </div>
+            )}
+
+            <div 
+              ref={scrollContainerRef}
+              className="flex overflow-x-auto snap-x snap-mandatory gap-6 pb-6 no-scrollbar sm:grid sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 sm:overflow-x-visible sm:pb-0 scroll-smooth"
+            >
+              {displayedDresses.map((dress, index) => (
+                <motion.div
+                  key={dress.id}
+                  layoutId={`dress-card-${dress.id}`}
+                  initial={{ opacity: 0, y: 50 }}
+                  whileInView={{ opacity: 1, y: 0 }}
+                  viewport={{ once: true, margin: "-80px" }}
+                  transition={{ 
+                    duration: 0.8, 
+                    ease: [0.16, 1, 0.3, 1], // Luxurious custom cubic-bezier
+                    delay: (index % 4) * 0.1 // Elegant staggered animation based on column index
+                  }}
+                  onClick={() => {
+                    setActiveDress(dress);
+                    setIsDressOpen(true);
+                  }}
+                  className="min-w-[85%] max-w-[90%] sm:min-w-0 sm:max-w-none snap-center shrink-0 bg-white rounded-md overflow-hidden border border-bento-gold/20 shadow-sm hover:shadow-md transition-all duration-300 group cursor-pointer flex flex-col justify-between"
+                >
+                  {/* Media frame */}
+                  <div className="h-72 overflow-hidden relative bg-bento-bg">
+                    <img
+                      src={dress.images[0]}
+                      alt={dress.name}
+                      className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105"
+                    />
+                    {/* Category overlay */}
+                    <span className="absolute top-4 left-4 bg-bento-dark/90 text-white text-[8px] uppercase font-sans tracking-widest px-3 py-1 rounded-none border border-bento-gold/30">
+                      {dress.category}
                     </span>
-                  </div>
-                </div>
-
-                {/* Info and price panel */}
-                <div className="p-5 space-y-4 flex-1 flex flex-col justify-between">
-                  <div className="space-y-2">
-                    <h3 className="font-serif font-light text-bento-text text-lg group-hover:text-bento-gold transition-colors line-clamp-1 uppercase tracking-wide">
-                      {dress.name}
-                    </h3>
-                    <p className="text-xs text-bento-text/70 line-clamp-2 leading-relaxed font-sans">
-                      {dress.description}
-                    </p>
+                    
+                    {/* Quick-View hover panel */}
+                    <div className="absolute inset-0 bg-bento-dark/30 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
+                      <span className="bg-white text-bento-text text-[9px] font-sans uppercase tracking-widest px-4 py-2.5 rounded-none border border-bento-gold/25 shadow-lg transform translate-y-3 group-hover:translate-y-0 transition-transform flex items-center gap-1.5">
+                        <Eye className="w-3.5 h-3.5 text-bento-gold" /> Détails & Réservation
+                      </span>
+                    </div>
                   </div>
 
-                  <div className="pt-3.5 border-t border-bento-gold/15 flex items-center justify-between">
-                    <div>
-                      <p className="text-[8px] text-bento-text/50 uppercase tracking-widest font-sans font-semibold">Location / Jour</p>
-                      <p className="font-serif font-light text-bento-gold text-base">
-                        {dress.pricePerDay.toLocaleString()} DZD
+                  {/* Info and price panel */}
+                  <div className="p-5 space-y-4 flex-1 flex flex-col justify-between">
+                    <div className="space-y-2">
+                      <h3 className="font-serif font-light text-bento-text text-lg group-hover:text-bento-gold transition-colors line-clamp-1 uppercase tracking-wide">
+                        {dress.name}
+                      </h3>
+                      <p className="text-xs text-bento-text/70 line-clamp-2 leading-relaxed font-sans">
+                        {dress.description}
                       </p>
                     </div>
 
-                    <button className="bg-bento-rose text-bento-gold hover:bg-bento-gold hover:text-white border border-bento-gold/25 px-4 py-2 rounded-none text-[9px] font-sans uppercase tracking-widest transition-all cursor-pointer flex items-center gap-1">
-                      <span>Réserver</span> <ChevronRight className="w-3 h-3" />
-                    </button>
+                    <div className="pt-3.5 border-t border-bento-gold/15 flex items-center justify-between">
+                      <div>
+                        <p className="text-[8px] text-bento-text/50 uppercase tracking-widest font-sans font-semibold">Location / Jour</p>
+                        <p className="font-serif font-light text-bento-gold text-base">
+                          {dress.pricePerDay.toLocaleString()} DZD
+                        </p>
+                      </div>
+
+                      <button className="bg-bento-rose text-bento-gold hover:bg-bento-gold hover:text-white border border-bento-gold/25 px-4 py-2 rounded-none text-[9px] font-sans uppercase tracking-widest transition-all cursor-pointer flex items-center gap-1">
+                        <span>Réserver</span> <ChevronRight className="w-3 h-3" />
+                      </button>
+                    </div>
                   </div>
-                </div>
-              </motion.div>
-            ))}
+                </motion.div>
+              ))}
+            </div>
+
+            {/* Mobile swipe helper text indicator */}
+            <div className="flex sm:hidden items-center justify-center gap-1.5 mt-4 text-[9px] text-bento-text/40 font-sans uppercase tracking-widest animate-pulse">
+              <span>Faites défiler horizontalement pour plus de modèles</span>
+              <span className="text-bento-gold font-bold">↔</span>
+            </div>
           </div>
         )}
       </section>

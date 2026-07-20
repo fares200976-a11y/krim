@@ -380,7 +380,9 @@ export default function AdminPanel({
     
     // Rows
     listToExport.forEach(b => {
-      const formattedDate = new Date(b.date).toLocaleDateString('fr-FR');
+      const formattedDate = b.endDate 
+        ? `Du ${new Date(b.date).toLocaleDateString('fr-FR')} au ${new Date(b.endDate).toLocaleDateString('fr-FR')}`
+        : new Date(b.date).toLocaleDateString('fr-FR');
       const formattedFittingDate = b.fittingDate ? new Date(b.fittingDate).toLocaleDateString('fr-FR') : "Aucun";
       const paymentStatus = b.depositPaid ? "Payé" : "Non payé";
       const reservationStatus = b.status === 'confirmed' ? 'Confirmé' : b.status === 'cancelled' ? 'Annulé' : 'En attente';
@@ -706,7 +708,10 @@ export default function AdminPanel({
                             </td>
                             <td className="p-4">
                               <div className="font-mono font-medium text-zinc-600">
-                                {new Date(b.date).toLocaleDateString('fr-FR', { day: 'numeric', month: 'long', year: 'numeric' })}
+                                {b.endDate
+                                  ? `Du ${new Date(b.date).toLocaleDateString('fr-FR', { day: 'numeric', month: 'short' })} au ${new Date(b.endDate).toLocaleDateString('fr-FR', { day: 'numeric', month: 'long', year: 'numeric' })}`
+                                  : new Date(b.date).toLocaleDateString('fr-FR', { day: 'numeric', month: 'long', year: 'numeric' })
+                                }
                               </div>
                               {b.fittingDate && (
                                 <div className="text-[11px] text-emerald-700 bg-emerald-50 border border-emerald-100/50 p-1 px-2 mt-1 rounded inline-block font-sans font-semibold">
