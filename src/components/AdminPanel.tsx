@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { 
   Lock, Calendar, Sparkles, FolderHeart, Users, HeartHandshake, 
   Trash2, Plus, Edit, Check, X, FileAudio, Image as ImageIcon, 
-  Search, BarChart3, ArrowUpRight, DollarSign, PlusCircle, LogOut, Download, Film
+  Search, BarChart3, ArrowUpRight, DollarSign, PlusCircle, LogOut, Download, Film, Menu
 } from 'lucide-react';
 import { motion } from 'motion/react';
 import { Dress, Booking, TeamMember, Testimonial, AppSettings, Category, DefileVideo } from '../types';
@@ -21,6 +21,9 @@ interface AdminPanelProps {
   settings: AppSettings;
   setSettings: React.Dispatch<React.SetStateAction<AppSettings>>;
   onClose: () => void;
+  displayMode: 'auto' | 'pc' | 'mobile';
+  setDisplayMode: (mode: 'auto' | 'pc' | 'mobile') => void;
+  isMobileLayout: boolean;
 }
 
 export default function AdminPanel({
@@ -30,12 +33,18 @@ export default function AdminPanel({
   testimonials, setTestimonials,
   defileVideos, setDefileVideos,
   settings, setSettings,
-  onClose
+  onClose,
+  displayMode,
+  setDisplayMode,
+  isMobileLayout
 }: AdminPanelProps) {
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [usernameInput, setUsernameInput] = useState('');
   const [passwordInput, setPasswordInput] = useState('');
   const [loginError, setLoginError] = useState('');
+
+  // Mobile navigation state
+  const [isMobileNavOpen, setIsMobileNavOpen] = useState(false);
 
   // Navigation tabs: 'bookings' | 'dresses' | 'defile_videos' | 'settings' | 'team_testimonials'
   const [activeTab, setActiveTab] = useState<'bookings' | 'dresses' | 'defile_videos' | 'settings' | 'team_testimonials'>('bookings');
@@ -623,23 +632,39 @@ export default function AdminPanel({
   }
 
   return (
-    <div id="admin-dashboard-full" className="fixed inset-0 z-50 bg-[#FAF7F5] text-bento-text flex flex-col md:flex-row h-screen overflow-hidden font-sans">
+    <div id="admin-dashboard-full" className={`fixed inset-0 z-50 bg-[#FAF7F5] text-bento-text flex h-screen overflow-hidden font-sans ${isMobileLayout ? 'flex-col' : 'flex-row'}`}>
       {/* Sidebar navigation */}
-      <div className="w-full md:w-64 bg-bento-dark text-white flex flex-col border-r border-bento-gold/15 shrink-0">
-        <div className="p-6 border-b border-bento-gold/15 flex items-center gap-3">
-          <div className="w-8 h-8 rounded-none bg-bento-gold flex items-center justify-center font-serif text-white font-bold">
-            C
+      <div className={`bg-bento-dark text-white flex flex-col border-r border-bento-gold/15 shrink-0 ${isMobileLayout ? 'w-full' : 'w-64'}`}>
+        <div className="p-6 border-b border-bento-gold/15 flex items-center justify-between gap-3">
+          <div className="flex items-center gap-3">
+            <div className="w-8 h-8 rounded-none bg-bento-gold flex items-center justify-center font-serif text-white font-bold">
+              C
+            </div>
+            <div>
+              <h3 className="font-serif font-light text-xs tracking-wider uppercase">Coup de Cœur</h3>
+              <p className="text-[9px] text-bento-gold/75 uppercase tracking-[0.2em] font-sans font-bold">Administration</p>
+            </div>
           </div>
-          <div>
-            <h3 className="font-serif font-light text-xs tracking-wider uppercase">Coup de Cœur</h3>
-            <p className="text-[9px] text-bento-gold/75 uppercase tracking-[0.2em] font-sans font-bold">Administration</p>
-          </div>
+          
+          {/* Hamburger Menu button for Mobile view */}
+          {isMobileLayout && (
+            <button 
+              onClick={() => setIsMobileNavOpen(!isMobileNavOpen)}
+              className="p-2 text-white/80 hover:text-white hover:bg-white/10 rounded transition-colors cursor-pointer flex items-center justify-center"
+              title="Menu de navigation"
+            >
+              {isMobileNavOpen ? <X className="w-5 h-5" /> : <Menu className="w-5 h-5" />}
+            </button>
+          )}
         </div>
 
-        {/* Navigation links */}
-        <nav className="flex-1 px-4 py-6 space-y-1.5 overflow-y-auto">
+        {/* Navigation links - collapsed on mobile by default */}
+        <nav className={`flex-1 px-4 py-6 space-y-1.5 overflow-y-auto ${!isMobileLayout || isMobileNavOpen ? 'block' : 'hidden'}`}>
           <button
-            onClick={() => setActiveTab('bookings')}
+            onClick={() => {
+              setActiveTab('bookings');
+              setIsMobileNavOpen(false);
+            }}
             className={`w-full text-left px-4 py-3 rounded-none text-[10px] font-sans font-bold uppercase tracking-wider transition-all flex items-center gap-3 cursor-pointer ${
               activeTab === 'bookings' ? 'bg-bento-gold text-white' : 'text-white/60 hover:bg-bento-gold/15 hover:text-white'
             }`}
@@ -649,7 +674,10 @@ export default function AdminPanel({
           </button>
 
           <button
-            onClick={() => setActiveTab('dresses')}
+            onClick={() => {
+              setActiveTab('dresses');
+              setIsMobileNavOpen(false);
+            }}
             className={`w-full text-left px-4 py-3 rounded-none text-[10px] font-sans font-bold uppercase tracking-wider transition-all flex items-center gap-3 cursor-pointer ${
               activeTab === 'dresses' ? 'bg-bento-gold text-white' : 'text-white/60 hover:bg-bento-gold/15 hover:text-white'
             }`}
@@ -659,7 +687,10 @@ export default function AdminPanel({
           </button>
 
           <button
-            onClick={() => setActiveTab('defile_videos')}
+            onClick={() => {
+              setActiveTab('defile_videos');
+              setIsMobileNavOpen(false);
+            }}
             className={`w-full text-left px-4 py-3 rounded-none text-[10px] font-sans font-bold uppercase tracking-wider transition-all flex items-center gap-3 cursor-pointer ${
               activeTab === 'defile_videos' ? 'bg-bento-gold text-white' : 'text-white/60 hover:bg-bento-gold/15 hover:text-white'
             }`}
@@ -669,7 +700,10 @@ export default function AdminPanel({
           </button>
 
           <button
-            onClick={() => setActiveTab('team_testimonials')}
+            onClick={() => {
+              setActiveTab('team_testimonials');
+              setIsMobileNavOpen(false);
+            }}
             className={`w-full text-left px-4 py-3 rounded-none text-[10px] font-sans font-bold uppercase tracking-wider transition-all flex items-center gap-3 cursor-pointer ${
               activeTab === 'team_testimonials' ? 'bg-bento-gold text-white' : 'text-white/60 hover:bg-bento-gold/15 hover:text-white'
             }`}
@@ -679,7 +713,10 @@ export default function AdminPanel({
           </button>
 
           <button
-            onClick={() => setActiveTab('settings')}
+            onClick={() => {
+              setActiveTab('settings');
+              setIsMobileNavOpen(false);
+            }}
             className={`w-full text-left px-4 py-3 rounded-none text-[10px] font-sans font-bold uppercase tracking-wider transition-all flex items-center gap-3 cursor-pointer ${
               activeTab === 'settings' ? 'bg-bento-gold text-white' : 'text-white/60 hover:bg-bento-gold/15 hover:text-white'
             }`}
@@ -689,8 +726,8 @@ export default function AdminPanel({
           </button>
         </nav>
 
-        {/* Footer Actions */}
-        <div className="p-4 border-t border-bento-gold/15 space-y-2">
+        {/* Footer Actions - collapsed on mobile by default */}
+        <div className={`p-4 border-t border-bento-gold/15 space-y-2 ${!isMobileLayout || isMobileNavOpen ? 'block' : 'hidden'}`}>
           <button
             onClick={() => setIsAuthenticated(false)}
             className="w-full text-left px-4 py-2.5 rounded-none text-[9px] uppercase tracking-widest font-sans font-bold text-rose-400 hover:bg-rose-500/10 transition-colors flex items-center gap-2 cursor-pointer"
@@ -797,98 +834,197 @@ export default function AdminPanel({
                       <p className="text-sm">Aucune réservation ne correspond à vos critères.</p>
                     </div>
                   ) : (
-                    <table className="w-full text-left border-collapse">
-                      <thead>
-                        <tr className="bg-zinc-50 text-zinc-400 text-xs font-semibold uppercase tracking-wider border-b border-zinc-100">
-                          <th className="p-4 pl-6">Client</th>
-                          <th className="p-4">Robe / Tenue</th>
-                          <th className="p-4">Date de Location</th>
-                          <th className="p-4">Taille</th>
-                          <th className="p-4">Acompte Payé</th>
-                          <th className="p-4">Statut</th>
-                          <th className="p-4 pr-6 text-right">Actions</th>
-                        </tr>
-                      </thead>
-                      <tbody className="divide-y divide-zinc-100 text-sm">
+                    <>
+                      {/* Desktop Table View */}
+                      <table className={`${isMobileLayout ? 'hidden' : 'table'} w-full text-left border-collapse`}>
+                        <thead>
+                          <tr className="bg-zinc-50 text-zinc-400 text-xs font-semibold uppercase tracking-wider border-b border-zinc-100">
+                            <th className="p-4 pl-6">Client</th>
+                            <th className="p-4">Robe / Tenue</th>
+                            <th className="p-4">Date de Location</th>
+                            <th className="p-4">Taille</th>
+                            <th className="p-4">Acompte Payé</th>
+                            <th className="p-4">Statut</th>
+                            <th className="p-4 pr-6 text-right">Actions</th>
+                          </tr>
+                        </thead>
+                        <tbody className="divide-y divide-zinc-100 text-sm">
+                          {filteredBookings.map((b) => (
+                            <tr key={b.id} className="hover:bg-zinc-50/50 transition-colors">
+                              <td className="p-4 pl-6">
+                                <div className="font-medium text-zinc-800">{b.customerName}</div>
+                                <div className="text-xs text-zinc-400">{b.customerPhone} | {b.customerEmail}</div>
+                                {b.notes && (
+                                  <div className="text-[11px] text-gold-600 bg-gold-50/50 p-1 px-2 rounded mt-1 italic inline-block">
+                                    Note: {b.notes}
+                                  </div>
+                                )}
+                              </td>
+                              <td className="p-4">
+                                <div className="flex items-center gap-2.5">
+                                  <img src={b.dressImage} alt={b.dressName} className="w-8 h-8 rounded-lg object-cover" />
+                                  <span className="font-medium text-zinc-700">{b.dressName}</span>
+                                </div>
+                              </td>
+                              <td className="p-4">
+                                <div className="font-mono font-medium text-zinc-600">
+                                  {b.endDate
+                                    ? `Du ${new Date(b.date).toLocaleDateString('fr-FR', { day: 'numeric', month: 'short' })} au ${new Date(b.endDate).toLocaleDateString('fr-FR', { day: 'numeric', month: 'long', year: 'numeric' })}`
+                                    : new Date(b.date).toLocaleDateString('fr-FR', { day: 'numeric', month: 'long', year: 'numeric' })
+                                  }
+                                </div>
+                                {b.fittingDate && (
+                                  <div className="text-[11px] text-emerald-700 bg-emerald-50 border border-emerald-100/50 p-1 px-2 mt-1 rounded inline-block font-sans font-semibold">
+                                    👗 Essai: {new Date(b.fittingDate).toLocaleDateString('fr-FR', { day: 'numeric', month: 'short', year: 'numeric' })}
+                                  </div>
+                                )}
+                              </td>
+                              <td className="p-4">
+                                <span className="bg-zinc-100 text-zinc-800 font-bold text-xs px-2 py-0.5 rounded border border-zinc-200">
+                                  {b.size}
+                                </span>
+                              </td>
+                              <td className="p-4">
+                                <span className="text-emerald-600 font-bold">{b.depositAmount.toLocaleString()} DZD</span>
+                                <span className="text-[10px] text-zinc-400 block font-sans">{b.depositPaid ? "En ligne (Payé)" : "Non payé"}</span>
+                              </td>
+                              <td className="p-4">
+                                <span className={`px-2.5 py-1 rounded-full text-xs font-semibold ${
+                                  b.status === 'confirmed' ? 'bg-emerald-50 text-emerald-600 border border-emerald-100' :
+                                  b.status === 'cancelled' ? 'bg-rose-50 text-rose-600 border border-rose-100' :
+                                  'bg-amber-50 text-amber-600 border border-amber-100'
+                                }`}>
+                                  {b.status === 'confirmed' ? 'Confirmé' : b.status === 'cancelled' ? 'Annulé' : 'En attente'}
+                                </span>
+                              </td>
+                              <td className="p-4 pr-6 text-right space-x-1.5 whitespace-nowrap">
+                                {b.status === 'pending' && (
+                                  <button
+                                    onClick={() => updateBookingStatus(b.id, 'confirmed')}
+                                    className="p-1 text-emerald-500 hover:bg-emerald-50 rounded border border-emerald-200 transition-colors cursor-pointer"
+                                    title="Confirmer la réservation"
+                                  >
+                                    <Check className="w-4 h-4" />
+                                  </button>
+                                )}
+                                {b.status !== 'cancelled' && (
+                                  <button
+                                    onClick={() => updateBookingStatus(b.id, 'cancelled')}
+                                    className="p-1 text-rose-500 hover:bg-rose-50 rounded border border-rose-200 transition-colors cursor-pointer"
+                                    title="Annuler la réservation"
+                                  >
+                                    <X className="w-4 h-4" />
+                                  </button>
+                                )}
+                                <button
+                                  onClick={() => deleteBooking(b.id)}
+                                  className="p-1 text-zinc-400 hover:text-rose-600 hover:bg-zinc-100 rounded transition-colors cursor-pointer"
+                                  title="Supprimer définitivement"
+                                >
+                                  <Trash2 className="w-4 h-4" />
+                                </button>
+                              </td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+
+                      {/* Mobile Card List View (Vertical Stack) */}
+                      <div className={`${isMobileLayout ? 'block' : 'hidden'} divide-y divide-zinc-100 font-sans p-2 space-y-4`}>
                         {filteredBookings.map((b) => (
-                          <tr key={b.id} className="hover:bg-zinc-50/50 transition-colors">
-                            <td className="p-4 pl-6">
-                              <div className="font-medium text-zinc-800">{b.customerName}</div>
-                              <div className="text-xs text-zinc-400">{b.customerPhone} | {b.customerEmail}</div>
-                              {b.notes && (
-                                <div className="text-[11px] text-gold-600 bg-gold-50/50 p-1 px-2 rounded mt-1 italic inline-block">
-                                  Note: {b.notes}
-                                </div>
-                              )}
-                            </td>
-                            <td className="p-4">
-                              <div className="flex items-center gap-2.5">
-                                <img src={b.dressImage} alt={b.dressName} className="w-8 h-8 rounded-lg object-cover" />
-                                <span className="font-medium text-zinc-700">{b.dressName}</span>
+                          <div key={b.id} className="bg-white border border-zinc-100 rounded-lg p-4 space-y-3 shadow-xs">
+                            {/* Header Row: Customer and Status */}
+                            <div className="flex justify-between items-start">
+                              <div>
+                                <h4 className="font-bold text-zinc-800 text-sm">{b.customerName}</h4>
+                                <p className="text-[11px] text-zinc-500 font-medium">{b.customerPhone}</p>
+                                <p className="text-[11px] text-zinc-400">{b.customerEmail}</p>
                               </div>
-                            </td>
-                            <td className="p-4">
-                              <div className="font-mono font-medium text-zinc-600">
-                                {b.endDate
-                                  ? `Du ${new Date(b.date).toLocaleDateString('fr-FR', { day: 'numeric', month: 'short' })} au ${new Date(b.endDate).toLocaleDateString('fr-FR', { day: 'numeric', month: 'long', year: 'numeric' })}`
-                                  : new Date(b.date).toLocaleDateString('fr-FR', { day: 'numeric', month: 'long', year: 'numeric' })
-                                }
-                              </div>
-                              {b.fittingDate && (
-                                <div className="text-[11px] text-emerald-700 bg-emerald-50 border border-emerald-100/50 p-1 px-2 mt-1 rounded inline-block font-sans font-semibold">
-                                  👗 Essai: {new Date(b.fittingDate).toLocaleDateString('fr-FR', { day: 'numeric', month: 'short', year: 'numeric' })}
-                                </div>
-                              )}
-                            </td>
-                            <td className="p-4">
-                              <span className="bg-zinc-100 text-zinc-800 font-bold text-xs px-2 py-0.5 rounded border border-zinc-200">
-                                {b.size}
-                              </span>
-                            </td>
-                            <td className="p-4">
-                              <span className="text-emerald-600 font-bold">{b.depositAmount.toLocaleString()} DZD</span>
-                              <span className="text-[10px] text-zinc-400 block font-sans">{b.depositPaid ? "En ligne (Payé)" : "Non payé"}</span>
-                            </td>
-                            <td className="p-4">
-                              <span className={`px-2.5 py-1 rounded-full text-xs font-semibold ${
+                              <span className={`px-2 py-0.5 rounded text-[10px] font-semibold ${
                                 b.status === 'confirmed' ? 'bg-emerald-50 text-emerald-600 border border-emerald-100' :
                                 b.status === 'cancelled' ? 'bg-rose-50 text-rose-600 border border-rose-100' :
                                 'bg-amber-50 text-amber-600 border border-amber-100'
                               }`}>
                                 {b.status === 'confirmed' ? 'Confirmé' : b.status === 'cancelled' ? 'Annulé' : 'En attente'}
                               </span>
-                            </td>
-                            <td className="p-4 pr-6 text-right space-x-1.5 whitespace-nowrap">
+                            </div>
+
+                            {/* Dress info */}
+                            <div className="flex items-center gap-3 bg-zinc-50 p-2 rounded">
+                              <img src={b.dressImage} alt={b.dressName} className="w-10 h-10 rounded object-cover" />
+                              <div className="flex-1 min-w-0">
+                                <p className="font-semibold text-zinc-800 text-xs truncate">{b.dressName}</p>
+                                <p className="text-[10px] text-zinc-500">Taille: <span className="font-bold">{b.size}</span></p>
+                              </div>
+                            </div>
+
+                            {/* Dates details */}
+                            <div className="space-y-1 text-xs">
+                              <div>
+                                <p className="text-zinc-400 font-medium text-[10px] uppercase">Période de location :</p>
+                                <p className="text-zinc-700 font-medium">
+                                  {b.endDate
+                                    ? `Du ${new Date(b.date).toLocaleDateString('fr-FR')} au ${new Date(b.endDate).toLocaleDateString('fr-FR')}`
+                                    : new Date(b.date).toLocaleDateString('fr-FR')
+                                  }
+                                </p>
+                              </div>
+                              {b.fittingDate && (
+                                <div className="bg-emerald-50 border border-emerald-100 p-1 px-2 rounded inline-block">
+                                  <p className="text-emerald-800 text-[10px] font-semibold">
+                                    👗 Jour d'Essai : {new Date(b.fittingDate).toLocaleDateString('fr-FR')}
+                                  </p>
+                                </div>
+                              )}
+                            </div>
+
+                            {/* Deposit details */}
+                            <div className="flex justify-between items-center pt-2 border-t border-zinc-100 text-xs">
+                              <div>
+                                <span className="text-zinc-400 text-[10px] uppercase block">Acompte Requis :</span>
+                                <span className="text-emerald-600 font-bold text-sm">{b.depositAmount.toLocaleString()} DZD</span>
+                              </div>
+                              <span className="text-zinc-500 text-[11px] font-medium bg-zinc-100 px-2 py-0.5 rounded">
+                                {b.depositPaid ? "Payé" : "Non payé"}
+                              </span>
+                            </div>
+
+                            {b.notes && (
+                              <div className="text-[11px] text-gold-700 bg-gold-50 border border-gold-100 p-2 rounded italic">
+                                Note : {b.notes}
+                              </div>
+                            )}
+
+                            {/* Actions block */}
+                            <div className="flex items-center justify-end gap-2 pt-2 border-t border-zinc-100">
                               {b.status === 'pending' && (
                                 <button
                                   onClick={() => updateBookingStatus(b.id, 'confirmed')}
-                                  className="p-1 text-emerald-500 hover:bg-emerald-50 rounded border border-emerald-200 transition-colors cursor-pointer"
-                                  title="Confirmer la réservation"
+                                  className="px-3 py-1.5 bg-emerald-50 text-emerald-600 hover:bg-emerald-100 rounded text-xs font-bold transition-colors cursor-pointer flex items-center gap-1"
                                 >
-                                  <Check className="w-4 h-4" />
+                                  <Check className="w-3.5 h-3.5" /> Confirmer
                                 </button>
                               )}
                               {b.status !== 'cancelled' && (
                                 <button
                                   onClick={() => updateBookingStatus(b.id, 'cancelled')}
-                                  className="p-1 text-rose-500 hover:bg-rose-50 rounded border border-rose-200 transition-colors cursor-pointer"
-                                  title="Annuler la réservation"
+                                  className="px-3 py-1.5 bg-rose-50 text-rose-600 hover:bg-rose-100 rounded text-xs font-bold transition-colors cursor-pointer flex items-center gap-1"
                                 >
-                                  <X className="w-4 h-4" />
+                                  <X className="w-3.5 h-3.5" /> Annuler
                                 </button>
                               )}
                               <button
                                 onClick={() => deleteBooking(b.id)}
-                                className="p-1 text-zinc-400 hover:text-rose-600 hover:bg-zinc-100 rounded transition-colors cursor-pointer"
-                                title="Supprimer définitivement"
+                                className="p-2 text-zinc-400 hover:text-rose-600 hover:bg-zinc-100 rounded transition-colors cursor-pointer"
+                                title="Supprimer"
                               >
                                 <Trash2 className="w-4 h-4" />
                               </button>
-                            </td>
-                          </tr>
+                            </div>
+                          </div>
                         ))}
-                      </tbody>
-                    </table>
+                      </div>
+                    </>
                   )}
                 </div>
               </div>

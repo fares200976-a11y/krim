@@ -116,6 +116,30 @@ export default function App() {
     }
   }, []);
 
+  // --- Display Mode State & Device Auto-Detection ---
+  const [displayMode, setDisplayMode] = useState<'auto' | 'pc' | 'mobile'>(() => {
+    return (localStorage.getItem('boutique_display_mode') as 'auto' | 'pc' | 'mobile') || 'auto';
+  });
+  const [isMobileDevice, setIsMobileDevice] = useState(false);
+
+  useEffect(() => {
+    const checkDevice = () => {
+      const mobileWidth = window.innerWidth < 1024; // Use 1024 as breakpoint for fully responsive check
+      const mobileUA = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
+      setIsMobileDevice(mobileWidth || mobileUA);
+    };
+    checkDevice();
+    window.addEventListener('resize', checkDevice);
+    return () => window.removeEventListener('resize', checkDevice);
+  }, []);
+
+  const handleSetDisplayMode = (mode: 'auto' | 'pc' | 'mobile') => {
+    setDisplayMode(mode);
+    localStorage.setItem('boutique_display_mode', mode);
+  };
+
+  const isMobileLayout = displayMode === 'mobile' || (displayMode === 'auto' && isMobileDevice);
+
   // --- UI Layout & Navigation States ---
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [selectedCategory, setSelectedCategory] = useState<Category | 'Tous'>('Tous');
@@ -540,29 +564,12 @@ export default function App() {
           </div>
         ) : (
           <div className="relative">
-            {/* Quick-action navigation arrows for mobile swiping helper */}
-            {displayedDresses.length > 1 && (
-              <div className="flex sm:hidden justify-end gap-2 mb-4 px-1">
-                <button 
-                  onClick={() => scrollDresses('left')}
-                  className="w-9 h-9 flex items-center justify-center bg-white border border-bento-gold/30 text-bento-gold active:bg-bento-gold active:text-white transition-all shadow-xs rounded-full"
-                  title="Précédent"
-                >
-                  <ChevronLeft className="w-4 h-4" />
-                </button>
-                <button 
-                  onClick={() => scrollDresses('right')}
-                  className="w-9 h-9 flex items-center justify-center bg-white border border-bento-gold/30 text-bento-gold active:bg-bento-gold active:text-white transition-all shadow-xs rounded-full"
-                  title="Suivant"
-                >
-                  <ChevronRight className="w-4 h-4" />
-                </button>
-              </div>
-            )}
-
             <div 
-              ref={scrollContainerRef}
-              className="flex overflow-x-auto snap-x snap-mandatory gap-6 pb-6 no-scrollbar sm:grid sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 sm:overflow-x-visible sm:pb-0 scroll-smooth"
+              className={`grid gap-6 scroll-smooth ${
+                isMobileLayout 
+                  ? 'grid-cols-1' 
+                  : 'grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4'
+              }`}
             >
               {displayedDresses.map((dress, index) => (
                 <motion.div
@@ -580,7 +587,7 @@ export default function App() {
                     setActiveDress(dress);
                     setIsDressOpen(true);
                   }}
-                  className="min-w-[85%] max-w-[90%] sm:min-w-0 sm:max-w-none snap-center shrink-0 bg-white rounded-md overflow-hidden border border-bento-gold/20 shadow-sm hover:shadow-md transition-all duration-300 group cursor-pointer flex flex-col justify-between"
+                  className="w-full bg-white rounded-md overflow-hidden border border-bento-gold/20 shadow-sm hover:shadow-md transition-all duration-300 group cursor-pointer flex flex-col justify-between"
                 >
                   {/* Media frame */}
                   <div className="h-72 overflow-hidden relative bg-bento-bg">
@@ -628,12 +635,6 @@ export default function App() {
                   </div>
                 </motion.div>
               ))}
-            </div>
-
-            {/* Mobile swipe helper text indicator */}
-            <div className="flex sm:hidden items-center justify-center gap-1.5 mt-4 text-[9px] text-bento-text/40 font-sans uppercase tracking-widest animate-pulse">
-              <span>Faites défiler horizontalement pour plus de modèles</span>
-              <span className="text-bento-gold font-bold">↔</span>
             </div>
           </div>
         )}
@@ -1074,8 +1075,51 @@ export default function App() {
           settings={settings}
           setSettings={setSettings}
           onClose={() => setIsAdminOpen(false)}
+          displayMode={displayMode}
+          setDisplayMode={handleSetDisplayMode}
+          isMobileLayout={isMobileLayout}
         />
       )}
+
+      {/* FLOATING DISPLAY MODE SELECTOR (Auto-Detect vs Manual PC/Mobile) */}
+      <div id="display-mode-selector" className="fixed bottom-4 left-4 z-40 bg-white/90 backdrop-blur-md border border-bento-gold/30 p-1 rounded-full shadow-lg flex items-center gap-1 transition-all hover:border-bento-gold">
+        <span className="text-[8px] uppercase tracking-[0.2em] text-bento-text/60 font-sans font-bold pl-3 pr-1.5 hidden sm:inline-block">
+          Affichage :
+        </span>
+        <button
+          onClick={() => handleSetDisplayMode('auto')}
+          className={`text-[9px] uppercase tracking-widest font-sans font-bold px-3 py-1.5 rounded-full transition-all cursor-pointer flex items-center gap-1 ${
+            displayMode === 'auto'
+              ? 'bg-bento-gold text-white shadow-xs'
+              : 'text-bento-text/70 hover:bg-bento-rose'
+          }`}
+          title="Détection automatique"
+        >
+          <span>✨ Auto</span>
+        </button>
+        <button
+          onClick={() => handleSetDisplayMode('pc')}
+          className={`text-[9px] uppercase tracking-widest font-sans font-bold px-3 py-1.5 rounded-full transition-all cursor-pointer flex items-center gap-1 ${
+            displayMode === 'pc'
+              ? 'bg-bento-gold text-white shadow-xs'
+              : 'text-bento-text/70 hover:bg-bento-rose'
+          }`}
+          title="Forcer la version PC"
+        >
+          <span>💻 PC</span>
+        </button>
+        <button
+          onClick={() => handleSetDisplayMode('mobile')}
+          className={`text-[9px] uppercase tracking-widest font-sans font-bold px-3 py-1.5 rounded-full transition-all cursor-pointer flex items-center gap-1 ${
+            displayMode === 'mobile'
+              ? 'bg-bento-gold text-white shadow-xs'
+              : 'text-bento-text/70 hover:bg-bento-rose'
+          }`}
+          title="Forcer la version Mobile"
+        >
+          <span>📱 Mobile</span>
+        </button>
+      </div>
 
     </div>
   );
