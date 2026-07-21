@@ -70,5 +70,6 @@ export interface DefileVideo {
   description: string;
   videoUrl: string;
   coverImage: string;
+  aspectRatio?: 'landscape' | 'portrait';
 }
 

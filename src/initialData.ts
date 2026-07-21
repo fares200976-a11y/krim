@@ -192,7 +192,8 @@ export const INITIAL_DEFILES: DefileVideo[] = [
     category: 'Robes de mariée',
     description: 'Aperçu cinématographique en mouvement de notre somptueuse robe de mariée coupe princesse avec dentelle fine de Calais.',
     videoUrl: 'https://assets.mixkit.co/videos/preview/mixkit-bride-in-her-wedding-dress-outdoors-39912-large.mp4',
-    coverImage: 'https://images.unsplash.com/photo-1594552072238-b8a33785b261?auto=format&fit=crop&w=800&q=80'
+    coverImage: 'https://images.unsplash.com/photo-1594552072238-b8a33785b261?auto=format&fit=crop&w=800&q=80',
+    aspectRatio: 'portrait'
   },
   {
     id: 'defile-2',
@@ -200,7 +201,8 @@ export const INITIAL_DEFILES: DefileVideo[] = [
     category: 'Robes kabyles',
     description: 'Défilé de notre création kabyle royale en mouvement, mettant en valeur ses fardas traditionnels brodés main.',
     videoUrl: 'https://assets.mixkit.co/videos/preview/mixkit-woman-wearing-traditional-oriental-clothing-40742-large.mp4',
-    coverImage: 'https://images.unsplash.com/photo-1610030469668-93535c17b6b3?auto=format&fit=crop&w=800&q=80'
+    coverImage: 'https://images.unsplash.com/photo-1610030469668-93535c17b6b3?auto=format&fit=crop&w=800&q=80',
+    aspectRatio: 'portrait'
   }
 ];
 

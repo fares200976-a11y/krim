@@ -663,13 +663,13 @@ export default function App() {
       </section>
 
       {/* DÉFILÉS / VIDEO SECTION */}
-      <section id="videos" className="py-20 bg-bento-dark text-white relative border-y border-bento-gold/30">
+      <section id="videos" className="py-24 md:py-32 bg-bento-dark text-white relative border-y border-bento-gold/30">
         <div className="absolute inset-0 bg-[radial-gradient(circle_at_top_right,rgba(197,160,89,0.08),transparent_50%)]" />
         
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 relative z-10">
           
           {/* Header */}
-          <div className="text-center space-y-3.5 mb-16">
+          <div className="text-center space-y-4 mb-20">
             <span className="text-[10px] uppercase tracking-[0.3em] text-bento-gold font-bold bg-white/5 border border-bento-gold/25 px-4 py-1.5 inline-block rounded-none">
               La Collection en Mouvement
             </span>
@@ -683,16 +683,28 @@ export default function App() {
           </div>
 
           {/* Videos Showcase Grid */}
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6 md:gap-8 lg:gap-12">
+          <div className={`grid gap-8 md:gap-10 lg:gap-12 ${
+            defileVideos.some(v => v.aspectRatio === 'portrait')
+              ? 'grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 max-w-6xl mx-auto'
+              : 'grid-cols-1 md:grid-cols-2 max-w-5xl mx-auto'
+          }`}>
             
             {/* Custom Interactive Main Video (Defile Videos managed by Admin) */}
             {defileVideos.map((v) => {
               const whatsappClean = settings.notificationWhatsapp?.replace(/^00/, '').replace(/^\+/, '') || '213553318195';
+              const isPortrait = v.aspectRatio === 'portrait';
               return (
-                <div key={v.id} className="flex flex-col rounded-md overflow-hidden shadow-2xl bg-bento-dark/80 border border-bento-gold/20 transition-all duration-300 hover:border-bento-gold/40">
+                <div 
+                  key={v.id} 
+                  className={`flex flex-col rounded-md overflow-hidden shadow-2xl bg-bento-dark/80 border border-bento-gold/20 transition-all duration-300 hover:border-bento-gold/40 h-full w-full ${
+                    isPortrait ? 'max-w-[420px] mx-auto' : ''
+                  }`}
+                >
                   
-                  {/* Media Container */}
-                  <div className="relative aspect-video w-full overflow-hidden bg-black/40">
+                  {/* Media Container with Adaptive Aspect Ratio */}
+                  <div className={`relative w-full overflow-hidden bg-black/40 ${
+                    isPortrait ? 'aspect-[9/16]' : 'aspect-video'
+                  }`}>
                     {playingVideoId === v.id ? (
                       <video
                         src={v.videoUrl}
@@ -719,8 +731,8 @@ export default function App() {
                   </div>
 
                   {/* Info & Call-To-Action Block (Optimized for vertical readability on all phone models) */}
-                  <div className="p-4 md:p-5 flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-t border-bento-gold/15 bg-bento-dark">
-                    <div className="space-y-1 min-w-0 flex-1">
+                  <div className="p-4 md:p-5 flex flex-col justify-between flex-grow gap-4 border-t border-bento-gold/15 bg-bento-dark">
+                    <div className="space-y-1.5 min-w-0">
                       <p className="text-[9px] uppercase tracking-widest font-sans font-bold text-bento-gold">{v.category}</p>
                       <h4 className="font-serif font-light text-sm md:text-base text-white uppercase tracking-wide truncate" title={v.title}>{v.title}</h4>
                       <p className="text-[10px] md:text-xs text-white/60 font-sans line-clamp-2 leading-relaxed">{v.description}</p>
@@ -729,7 +741,7 @@ export default function App() {
                       href={`https://wa.me/${whatsappClean}?text=Bonjour%20Boutique%20Coup%20de%20C%C5%93ur,%20je%20suis%20int%C3%A9ress%C3%A9(e)%20par%20la%20tenue%20vue%20sur%20le%20d%C3%A9fil%C3%A9%20%22${encodeURIComponent(v.title)}%22.`}
                       target="_blank"
                       referrerPolicy="no-referrer"
-                      className="bg-bento-gold hover:bg-bento-gold-dark text-white text-[10px] font-sans uppercase tracking-widest px-4 py-2.5 rounded-none cursor-pointer transition-colors text-center shrink-0 w-full sm:w-auto font-medium"
+                      className="bg-bento-gold hover:bg-bento-gold-dark text-white text-[10px] font-sans uppercase tracking-widest px-4 py-3 rounded-none cursor-pointer transition-colors text-center shrink-0 w-full font-medium block"
                     >
                       S'informer
                     </a>
@@ -741,8 +753,8 @@ export default function App() {
 
             {/* Fallback Beautiful Cinematic Video Frame if no uploads are configured yet */}
             {defileVideos.length === 0 && (
-              <div className="md:col-span-2 text-center py-12 text-zinc-500 space-y-2">
-                <Film className="w-10 h-10 mx-auto text-bento-gold/30" />
+              <div className="md:col-span-2 text-center py-16 text-zinc-500 space-y-3">
+                <Film className="w-12 h-12 mx-auto text-bento-gold/30 animate-pulse" />
                 <p className="text-sm font-sans">Aucune vidéo de démonstration n'a été mise en ligne par l'administrateur.</p>
               </div>
             )}

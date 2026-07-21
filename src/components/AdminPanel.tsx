@@ -76,6 +76,7 @@ export default function AdminPanel({
   const [defileDescription, setDefileDescription] = useState('');
   const [defileVideoUrl, setDefileVideoUrl] = useState('');
   const [defileCoverImage, setDefileCoverImage] = useState('');
+  const [defileAspectRatio, setDefileAspectRatio] = useState<'landscape' | 'portrait'>('landscape');
 
   // Image compression utility to avoid LocalStorage quota exceed errors
   const compressBase64Image = (base64Str: string, maxWidth = 800, maxHeight = 800, quality = 0.7): Promise<string> => {
@@ -269,6 +270,7 @@ export default function AdminPanel({
     setDefileDescription('');
     setDefileVideoUrl('');
     setDefileCoverImage('');
+    setDefileAspectRatio('portrait'); // default to portrait since wedding dresses are long/vertical
     setIsDefileModalOpen(true);
   };
 
@@ -279,6 +281,7 @@ export default function AdminPanel({
     setDefileDescription(video.description);
     setDefileVideoUrl(video.videoUrl);
     setDefileCoverImage(video.coverImage);
+    setDefileAspectRatio(video.aspectRatio || 'landscape');
     setIsDefileModalOpen(true);
   };
 
@@ -294,7 +297,8 @@ export default function AdminPanel({
         category: defileCategory,
         description: defileDescription,
         videoUrl: defileVideoUrl,
-        coverImage: finalCoverImage
+        coverImage: finalCoverImage,
+        aspectRatio: defileAspectRatio
       } : v);
       setDefileVideos(updated);
       localStorage.setItem('boutique_defile_videos', JSON.stringify(updated));
@@ -305,7 +309,8 @@ export default function AdminPanel({
         category: defileCategory,
         description: defileDescription,
         videoUrl: defileVideoUrl,
-        coverImage: finalCoverImage
+        coverImage: finalCoverImage,
+        aspectRatio: defileAspectRatio
       };
       const updated = [newDefile, ...defileVideos];
       setDefileVideos(updated);
@@ -1153,9 +1158,14 @@ export default function AdminPanel({
                       )}
                       
                       {/* Category Badge */}
-                      <span className="absolute top-3 right-3 bg-zinc-900/80 text-white text-[10px] uppercase font-bold tracking-wider px-2.5 py-1 rounded">
-                        {v.category}
-                      </span>
+                      <div className="absolute top-3 right-3 flex flex-col gap-1 items-end">
+                        <span className="bg-zinc-900/80 text-white text-[10px] uppercase font-bold tracking-wider px-2.5 py-1 rounded">
+                          {v.category}
+                        </span>
+                        <span className="bg-amber-600/95 text-white text-[9px] uppercase font-bold tracking-wider px-2 py-0.5 rounded shadow-xs">
+                          {v.aspectRatio === 'portrait' ? '📱 Portrait 9:16' : '💻 Paysage 16:9'}
+                        </span>
+                      </div>
 
                       {/* Video Indicator */}
                       <div className="absolute inset-0 flex items-center justify-center bg-black/20 group-hover:bg-black/35 transition-colors">
@@ -2068,6 +2078,38 @@ export default function AdminPanel({
                 </div>
                 <span className="text-[10px] text-zinc-400 mt-1 block">
                   Sélectionnez un fichier MP4 local (inférieur à 2 Mo) ou collez une adresse de vidéo MP4 directe.
+                </span>
+              </div>
+
+              {/* Aspect Ratio choice */}
+              <div>
+                <label className="block text-xs font-bold text-zinc-500 uppercase mb-1 font-sans">Format d'affichage de la vidéo</label>
+                <div className="grid grid-cols-2 gap-3">
+                  <button
+                    type="button"
+                    onClick={() => setDefileAspectRatio('portrait')}
+                    className={`p-3 rounded-lg border text-xs font-bold transition-all flex items-center justify-center gap-2 cursor-pointer ${
+                      defileAspectRatio === 'portrait'
+                        ? 'border-amber-500 bg-amber-50 text-amber-700'
+                        : 'border-zinc-200 hover:bg-zinc-50 text-zinc-600'
+                    }`}
+                  >
+                    <span>📱 Portrait (9:16)</span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setDefileAspectRatio('landscape')}
+                    className={`p-3 rounded-lg border text-xs font-bold transition-all flex items-center justify-center gap-2 cursor-pointer ${
+                      defileAspectRatio === 'landscape'
+                        ? 'border-amber-500 bg-amber-50 text-amber-700'
+                        : 'border-zinc-200 hover:bg-zinc-50 text-zinc-600'
+                    }`}
+                  >
+                    <span>💻 Paysage (16:9)</span>
+                  </button>
+                </div>
+                <span className="text-[10px] text-zinc-400 mt-1 block">
+                  Le format Portrait (9:16) offre plus d'espace vertical et est parfait pour les vidéos capturées au smartphone montrant les robes sur toute leur longueur.
                 </span>
               </div>
 
