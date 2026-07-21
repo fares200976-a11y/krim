@@ -7,6 +7,18 @@ import {
 import { motion } from 'motion/react';
 import { Dress, Booking, TeamMember, Testimonial, AppSettings, Category, DefileVideo } from '../types';
 
+// Hache le mot de passe avec SHA-256 (Web Crypto API) avant de le stocker ou
+// de le comparer, pour éviter de garder un mot de passe en clair dans le
+// localStorage du navigateur. Note : comme il n'y a pas de serveur, cela
+// protège contre une lecture rapide du localStorage, mais pas contre
+// quelqu'un qui inspecterait le code JS lui-même — voir la remarque de
+// sécurité affichée dans l'onglet "Sécurité d'Administration".
+async function hashPassword(plain: string): Promise<string> {
+  const data = new TextEncoder().encode(plain);
+  const digest = await crypto.subtle.digest('SHA-256', data);
+  return Array.from(new Uint8Array(digest)).map(b => b.toString(16).padStart(2, '0')).join('');
+}
+
 interface AdminPanelProps {
   dresses: Dress[];
   setDresses: React.Dispatch<React.SetStateAction<Dress[]>>;
@@ -42,6 +54,17 @@ export default function AdminPanel({
   const [usernameInput, setUsernameInput] = useState('');
   const [passwordInput, setPasswordInput] = useState('');
   const [loginError, setLoginError] = useState('');
+  const [loginBusy, setLoginBusy] = useState(false);
+
+  // Tant qu'aucun identifiant admin n'a été configuré (premier lancement, ou
+  // après nettoyage d'un ancien mot de passe par défaut), on affiche un écran
+  // de création de compte plutôt qu'un écran de connexion.
+  const needsAccountSetup = !settings.adminPasswordHash;
+  const [setupUsername, setSetupUsername] = useState('');
+  const [setupPassword, setSetupPassword] = useState('');
+  const [setupPasswordConfirm, setSetupPasswordConfirm] = useState('');
+  const [setupError, setSetupError] = useState('');
+  const [setupBusy, setSetupBusy] = useState(false);
 
   // Mobile navigation state
   const [isMobileNavOpen, setIsMobileNavOpen] = useState(false);
@@ -136,22 +159,67 @@ export default function AdminPanel({
   const [settingsBg, setSettingsBg] = useState(settings.homepageBg);
   const [settingsMusicUrl, setSettingsMusicUrl] = useState(settings.backgroundMusicUrl);
   const [settingsMusicTitle, setSettingsMusicTitle] = useState(settings.musicTitle);
-  const [settingsUsername, setSettingsUsername] = useState(settings.adminUsername || 'karim2026');
-  const [settingsPassword, setSettingsPassword] = useState(settings.adminPasswordHash || 'karim123456');
+  const [settingsUsername, setSettingsUsername] = useState(settings.adminUsername || '');
+  // Laissé vide volontairement : on n'affiche jamais le hash existant. Le mot
+  // de passe n'est changé que si l'admin tape une nouvelle valeur ici.
+  const [settingsPassword, setSettingsPassword] = useState('');
+  const [settingsPasswordError, setSettingsPasswordError] = useState('');
   const [settingsNotifyEmail, setSettingsNotifyEmail] = useState(settings.notificationEmail || 'karimchabni395@gmail.com');
   const [settingsNotifyWhatsapp, setSettingsNotifyWhatsapp] = useState(settings.notificationWhatsapp || '00213553318195');
 
-  // Authentication logic
-  const handleLoginSubmit = (e: React.FormEvent) => {
+  // Authentication logic — compare against the stored SHA-256 hash, never
+  // against a plaintext password.
+  const handleLoginSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    const expectedUser = settings.adminUsername || 'karim2026';
-    const expectedPass = settings.adminPasswordHash || 'karim123456';
-    
-    if (usernameInput.trim().toLowerCase() === expectedUser.toLowerCase() && passwordInput === expectedPass) {
+    setLoginBusy(true);
+    setLoginError('');
+    try {
+      const expectedUser = settings.adminUsername || '';
+      const expectedHash = settings.adminPasswordHash || '';
+      const enteredHash = await hashPassword(passwordInput);
+
+      if (expectedHash && usernameInput.trim().toLowerCase() === expectedUser.toLowerCase() && enteredHash === expectedHash) {
+        setIsAuthenticated(true);
+      } else {
+        setLoginError("Nom d'utilisateur ou mot de passe incorrect.");
+      }
+    } finally {
+      setLoginBusy(false);
+    }
+  };
+
+  // Création du compte admin au premier lancement (aucun identifiant par
+  // défaut n'est fourni avec le code source).
+  const handleSetupSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setSetupError('');
+
+    if (!setupUsername.trim()) {
+      setSetupError("Veuillez choisir un nom d'utilisateur.");
+      return;
+    }
+    if (setupPassword.length < 8) {
+      setSetupError('Le mot de passe doit contenir au moins 8 caractères.');
+      return;
+    }
+    if (setupPassword !== setupPasswordConfirm) {
+      setSetupError('Les deux mots de passe ne correspondent pas.');
+      return;
+    }
+
+    setSetupBusy(true);
+    try {
+      const hash = await hashPassword(setupPassword);
+      const updated: AppSettings = {
+        ...settings,
+        adminUsername: setupUsername.trim(),
+        adminPasswordHash: hash,
+      };
+      setSettings(updated);
+      localStorage.setItem('boutique_settings', JSON.stringify(updated));
       setIsAuthenticated(true);
-      setLoginError('');
-    } else {
-      setLoginError("Nom d'utilisateur ou mot de passe incorrect.");
+    } finally {
+      setSetupBusy(false);
     }
   };
 
@@ -447,20 +515,33 @@ export default function AdminPanel({
   };
 
   // Save App Settings
-  const handleSettingsSubmit = (e: React.FormEvent) => {
+  const handleSettingsSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    setSettingsPasswordError('');
+
+    // Le mot de passe n'est modifié que si l'admin a tapé une nouvelle valeur.
+    let newPasswordHash = settings.adminPasswordHash;
+    if (settingsPassword.trim().length > 0) {
+      if (settingsPassword.length < 8) {
+        setSettingsPasswordError('Le nouveau mot de passe doit contenir au moins 8 caractères.');
+        return;
+      }
+      newPasswordHash = await hashPassword(settingsPassword);
+    }
+
     const updated: AppSettings = {
       ...settings,
       homepageBg: settingsBg,
       backgroundMusicUrl: settingsMusicUrl,
       musicTitle: settingsMusicTitle,
       adminUsername: settingsUsername,
-      adminPasswordHash: settingsPassword,
+      adminPasswordHash: newPasswordHash,
       notificationEmail: settingsNotifyEmail,
       notificationWhatsapp: settingsNotifyWhatsapp
     };
     setSettings(updated);
     localStorage.setItem('boutique_settings', JSON.stringify(updated));
+    setSettingsPassword(''); // on revide le champ après enregistrement
     alert('Paramètres enregistrés avec succès ! Le site et les alarmes ont été mis à jour.');
   };
 
@@ -557,6 +638,103 @@ export default function AdminPanel({
     d.category.toLowerCase().includes(dressSearch.toLowerCase())
   );
 
+  if (needsAccountSetup) {
+    return (
+      <div id="admin-setup-screen" className="fixed inset-0 z-50 flex items-center justify-center bg-zinc-950/75 backdrop-blur-md p-4">
+        <motion.div
+          initial={{ opacity: 0, y: 30 }}
+          animate={{ opacity: 1, y: 0 }}
+          className="w-full max-w-md bg-white rounded-none overflow-hidden border border-bento-gold/25 shadow-2xl p-8"
+        >
+          <div className="flex flex-col items-center text-center space-y-3 mb-6">
+            <div className="w-14 h-14 rounded-none bg-bento-rose border border-bento-gold/20 flex items-center justify-center text-bento-gold shadow-sm">
+              <Lock className="w-5 h-5" />
+            </div>
+            <h2 className="text-xl font-serif font-light text-bento-text uppercase tracking-wide">
+              Créer votre compte admin
+            </h2>
+            <p className="text-xs text-bento-text/60 max-w-xs font-sans">
+              Aucun compte administrateur n'existe encore sur ce navigateur. Choisissez un nom d'utilisateur et un mot de passe pour sécuriser l'accès à la gestion de la boutique.
+            </p>
+          </div>
+
+          <form onSubmit={handleSetupSubmit} className="space-y-4">
+            <div>
+              <label className="block text-[10px] uppercase tracking-widest text-bento-text/50 font-bold mb-1.5 font-sans">
+                Nom d'utilisateur
+              </label>
+              <input
+                type="text"
+                required
+                value={setupUsername}
+                onChange={(e) => setSetupUsername(e.target.value)}
+                placeholder="Choisissez un nom d'utilisateur"
+                className="w-full text-xs px-4 py-3.5 border border-bento-gold/20 bg-bento-rose/10 rounded-none focus:outline-none focus:border-bento-gold transition-colors font-sans"
+              />
+            </div>
+
+            <div>
+              <label className="block text-[10px] uppercase tracking-widest text-bento-text/50 font-bold mb-1.5 font-sans">
+                Mot de passe (8 caractères minimum)
+              </label>
+              <input
+                type="password"
+                required
+                minLength={8}
+                value={setupPassword}
+                onChange={(e) => setSetupPassword(e.target.value)}
+                placeholder="Mot de passe"
+                className="w-full text-xs px-4 py-3.5 border border-bento-gold/20 bg-bento-rose/10 rounded-none focus:outline-none focus:border-bento-gold transition-colors font-sans"
+              />
+            </div>
+
+            <div>
+              <label className="block text-[10px] uppercase tracking-widest text-bento-text/50 font-bold mb-1.5 font-sans">
+                Confirmer le mot de passe
+              </label>
+              <input
+                type="password"
+                required
+                minLength={8}
+                value={setupPasswordConfirm}
+                onChange={(e) => setSetupPasswordConfirm(e.target.value)}
+                placeholder="Confirmez le mot de passe"
+                className="w-full text-xs px-4 py-3.5 border border-bento-gold/20 bg-bento-rose/10 rounded-none focus:outline-none focus:border-bento-gold transition-colors font-sans"
+              />
+            </div>
+
+            <p className="text-[10px] text-bento-text/50 font-sans text-center leading-relaxed">
+              ⚠️ Ce site n'a pas de serveur : ces identifiants ne sont enregistrés que dans ce navigateur. Utilisez-les pour dissuader les visiteurs occasionnels, pas comme une protection contre une personne déterminée à lire le code du site.
+            </p>
+
+            {setupError && (
+              <p className="text-xs text-rose-600 bg-rose-50 border border-rose-100 p-2.5 rounded-none font-sans text-center">
+                {setupError}
+              </p>
+            )}
+
+            <div className="flex gap-3 pt-2">
+              <button
+                type="button"
+                onClick={onClose}
+                className="flex-1 bg-bento-rose border border-bento-gold/15 text-bento-text hover:bg-white uppercase tracking-widest text-[10px] py-3.5 rounded-none font-bold font-sans transition-all cursor-pointer"
+              >
+                Annuler
+              </button>
+              <button
+                type="submit"
+                disabled={setupBusy}
+                className="flex-1 bg-bento-gold hover:bg-bento-gold-dark text-white uppercase tracking-widest text-[10px] py-3.5 rounded-none font-bold font-sans transition-all cursor-pointer shadow-sm disabled:opacity-60"
+              >
+                {setupBusy ? 'Création...' : 'Créer le compte'}
+              </button>
+            </div>
+          </form>
+        </motion.div>
+      </div>
+    );
+  }
+
   if (!isAuthenticated) {
     return (
       <div id="admin-login-screen" className="fixed inset-0 z-50 flex items-center justify-center bg-zinc-950/75 backdrop-blur-md p-4">
@@ -604,9 +782,6 @@ export default function AdminPanel({
                 placeholder="Mot de passe"
                 className="w-full text-xs px-4 py-3.5 border border-bento-gold/20 bg-bento-rose/10 rounded-none focus:outline-none focus:border-bento-gold transition-colors font-sans"
               />
-              <span className="text-[10px] text-bento-text/50 mt-1.5 block font-sans text-center">
-                Identifiants par défaut : <strong className="text-bento-gold font-bold">karim2026</strong> / <strong className="text-bento-gold font-bold">karim123456</strong>
-              </span>
             </div>
 
             {loginError && (
@@ -625,9 +800,10 @@ export default function AdminPanel({
               </button>
               <button
                 type="submit"
-                className="flex-1 bg-bento-gold hover:bg-bento-gold-dark text-white uppercase tracking-widest text-[10px] py-3.5 rounded-none font-bold font-sans transition-all cursor-pointer shadow-sm"
+                disabled={loginBusy}
+                className="flex-1 bg-bento-gold hover:bg-bento-gold-dark text-white uppercase tracking-widest text-[10px] py-3.5 rounded-none font-bold font-sans transition-all cursor-pointer shadow-sm disabled:opacity-60"
               >
-                Déverrouiller
+                {loginBusy ? 'Vérification...' : 'Déverrouiller'}
               </button>
             </div>
           </form>
@@ -1399,12 +1575,15 @@ export default function AdminPanel({
                       </label>
                       <input
                         type="password"
-                        required
+                        minLength={8}
                         value={settingsPassword}
                         onChange={(e) => setSettingsPassword(e.target.value)}
                         className="w-full text-sm px-3.5 py-2.5 border border-zinc-200 rounded-lg focus:outline-none focus:border-gold-300 transition-colors"
-                        placeholder="karim2026"
+                        placeholder="Laisser vide pour ne pas changer"
                       />
+                      {settingsPasswordError && (
+                        <p className="text-[11px] text-rose-600 mt-1.5">{settingsPasswordError}</p>
+                      )}
                     </div>
                   </div>
                 </div>

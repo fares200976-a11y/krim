@@ -58,7 +58,7 @@ export interface AppSettings {
   backgroundMusicUrl: string;
   musicTitle: string;
   adminUsername?: string; // Nom d'utilisateur de l'admin (karim)
-  adminPasswordHash: string; // Mot de passe (karim2026)
+  adminPasswordHash: string; // Hash SHA-256 du mot de passe admin (jamais stocké en clair)
   notificationEmail?: string; // Email d'alarme (karimchabni395@gmail.com)
   notificationWhatsapp?: string; // WhatsApp d'alarme (00213553318195)
 }

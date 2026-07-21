@@ -32,10 +32,14 @@ export default function App() {
     if (localSettings) {
       try {
         const parsed = JSON.parse(localSettings);
-        // Force migration of default credentials if they are old or missing
-        if (!parsed.adminUsername || parsed.adminUsername === 'karim' || parsed.adminPasswordHash === 'admin123' || parsed.adminPasswordHash === 'karim2026') {
-          parsed.adminUsername = DEFAULT_SETTINGS.adminUsername;
-          parsed.adminPasswordHash = DEFAULT_SETTINGS.adminPasswordHash;
+        // Security: if this browser still has an old, publicly-known legacy
+        // password (from a previous version of this template), wipe it so the
+        // admin is forced through the "create your admin account" setup
+        // screen instead of silently falling back to a known credential.
+        const leakedLegacyPasswords = ['admin123', 'karim2026', 'karim123456'];
+        if (!parsed.adminUsername || parsed.adminUsername === 'karim' || leakedLegacyPasswords.includes(parsed.adminPasswordHash)) {
+          parsed.adminUsername = '';
+          parsed.adminPasswordHash = '';
         }
         // Ensure notification parameters are also merged
         if (!parsed.notificationEmail) parsed.notificationEmail = DEFAULT_SETTINGS.notificationEmail;

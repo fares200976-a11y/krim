@@ -179,8 +179,10 @@ export const DEFAULT_SETTINGS: AppSettings = {
   homepageBg: 'https://assets.mixkit.co/videos/preview/mixkit-bride-in-her-wedding-dress-outdoors-39912-large.mp4',
   backgroundMusicUrl: 'https://www.soundhelix.com/examples/mp3/SoundHelix-Song-8.mp3',
   musicTitle: 'Serenade Romantique d\'Amour (Instrumental)',
-  adminUsername: 'karim2026',
-  adminPasswordHash: 'karim123456',
+  // Aucun identifiant par défaut n'est fourni : au premier lancement, l'admin
+  // doit créer son propre compte via l'écran "Créer votre compte admin".
+  adminUsername: '',
+  adminPasswordHash: '',
   notificationEmail: 'karimchabni395@gmail.com',
   notificationWhatsapp: '00213553318195'
 };
