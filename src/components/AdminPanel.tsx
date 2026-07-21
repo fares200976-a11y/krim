@@ -6,6 +6,27 @@ import {
 } from 'lucide-react';
 import { motion } from 'motion/react';
 import { Dress, Booking, TeamMember, Testimonial, AppSettings, Category, DefileVideo } from '../types';
+import { addDocument, deleteDocument, saveCollection, updateDocument } from '../firebaseSync';
+
+const ADMIN_CREDENTIALS_KEY = 'boutique_admin_credentials';
+
+const readAdminCredentials = () => {
+  try {
+    const raw = localStorage.getItem(ADMIN_CREDENTIALS_KEY);
+    if (!raw) return { adminUsername: '', adminPasswordHash: '' };
+    const parsed = JSON.parse(raw) as { adminUsername?: string; adminPasswordHash?: string };
+    return {
+      adminUsername: parsed.adminUsername || '',
+      adminPasswordHash: parsed.adminPasswordHash || ''
+    };
+  } catch {
+    return { adminUsername: '', adminPasswordHash: '' };
+  }
+};
+
+const writeAdminCredentials = (adminUsername: string, adminPasswordHash: string) => {
+  localStorage.setItem(ADMIN_CREDENTIALS_KEY, JSON.stringify({ adminUsername, adminPasswordHash }));
+};
 
 // Hache le mot de passe avec SHA-256 (Web Crypto API) avant de le stocker ou
 // de le comparer, pour éviter de garder un mot de passe en clair dans le
@@ -174,8 +195,9 @@ export default function AdminPanel({
     setLoginBusy(true);
     setLoginError('');
     try {
-      const expectedUser = settings.adminUsername || '';
-      const expectedHash = settings.adminPasswordHash || '';
+      const credentials = readAdminCredentials();
+      const expectedUser = credentials.adminUsername || '';
+      const expectedHash = credentials.adminPasswordHash || '';
       const enteredHash = await hashPassword(passwordInput);
 
       if (expectedHash && usernameInput.trim().toLowerCase() === expectedUser.toLowerCase() && enteredHash === expectedHash) {
@@ -215,8 +237,16 @@ export default function AdminPanel({
         adminUsername: setupUsername.trim(),
         adminPasswordHash: hash,
       };
+      writeAdminCredentials(setupUsername.trim(), hash);
       setSettings(updated);
-      localStorage.setItem('boutique_settings', JSON.stringify(updated));
+      await updateDocument('settings', 'app', {
+        homepageBg: updated.homepageBg,
+        backgroundMusicUrl: updated.backgroundMusicUrl,
+        musicTitle: updated.musicTitle,
+        displayMode: updated.displayMode || 'auto',
+        notificationEmail: updated.notificationEmail,
+        notificationWhatsapp: updated.notificationWhatsapp,
+      });
       setIsAuthenticated(true);
     } finally {
       setSetupBusy(false);
@@ -234,14 +264,14 @@ export default function AdminPanel({
   const updateBookingStatus = (id: string, newStatus: 'confirmed' | 'cancelled') => {
     const updated = bookings.map(b => b.id === id ? { ...b, status: newStatus } : b);
     setBookings(updated);
-    localStorage.setItem('boutique_bookings', JSON.stringify(updated));
+    void saveCollection('bookings', updated);
   };
 
   const deleteBooking = (id: string) => {
     if (window.confirm('Voulez-vous vraiment supprimer cette réservation de la base de données ?')) {
       const updated = bookings.filter(b => b.id !== id);
       setBookings(updated);
-      localStorage.setItem('boutique_bookings', JSON.stringify(updated));
+      void deleteDocument('bookings', id);
     }
   };
 
@@ -300,7 +330,7 @@ export default function AdminPanel({
         available: dressAvailable
       } : d);
       setDresses(updated);
-      localStorage.setItem('boutique_dresses', JSON.stringify(updated));
+      void updateDocument('dresses', editingDress.id, updated.find(d => d.id === editingDress.id));
     } else {
       // Add
       const newDress: Dress = {
@@ -317,7 +347,9 @@ export default function AdminPanel({
       };
       const updated = [newDress, ...dresses];
       setDresses(updated);
-      localStorage.setItem('boutique_dresses', JSON.stringify(updated));
+      void addDocument('dresses', newDress).then((docRef) => {
+        setDresses((current) => current.map((dress) => dress.id === newDress.id ? { ...dress, id: docRef.id } : dress));
+      });
     }
     setIsDressModalOpen(false);
   };
@@ -326,7 +358,7 @@ export default function AdminPanel({
     if (window.confirm('Voulez-vous supprimer cette robe définitivement ?')) {
       const updated = dresses.filter(d => d.id !== id);
       setDresses(updated);
-      localStorage.setItem('boutique_dresses', JSON.stringify(updated));
+      void deleteDocument('dresses', id);
     }
   };
 
@@ -369,7 +401,7 @@ export default function AdminPanel({
         aspectRatio: defileAspectRatio
       } : v);
       setDefileVideos(updated);
-      localStorage.setItem('boutique_defile_videos', JSON.stringify(updated));
+      void updateDocument('videos', editingDefile.id, updated.find(v => v.id === editingDefile.id));
     } else {
       const newDefile: DefileVideo = {
         id: 'defile-' + Date.now(),
@@ -382,7 +414,9 @@ export default function AdminPanel({
       };
       const updated = [newDefile, ...defileVideos];
       setDefileVideos(updated);
-      localStorage.setItem('boutique_defile_videos', JSON.stringify(updated));
+      void addDocument('videos', newDefile).then((docRef) => {
+        setDefileVideos((current) => current.map((video) => video.id === newDefile.id ? { ...video, id: docRef.id } : video));
+      });
     }
     setIsDefileModalOpen(false);
   };
@@ -391,7 +425,7 @@ export default function AdminPanel({
     if (window.confirm('Voulez-vous supprimer cette vidéo de défilé définitivement ?')) {
       const updated = defileVideos.filter(v => v.id !== id);
       setDefileVideos(updated);
-      localStorage.setItem('boutique_defile_videos', JSON.stringify(updated));
+      void deleteDocument('videos', id);
     }
   };
 
@@ -431,7 +465,7 @@ export default function AdminPanel({
         emailAlarm: teamEmailAlarm
       } : t);
       setTeam(updated);
-      localStorage.setItem('boutique_team', JSON.stringify(updated));
+      void updateDocument('team', editingTeam.id, updated.find(t => t.id === editingTeam.id));
     } else {
       const newMember: TeamMember = {
         id: 'team-' + Date.now(),
@@ -443,7 +477,9 @@ export default function AdminPanel({
       };
       const updated = [...team, newMember];
       setTeam(updated);
-      localStorage.setItem('boutique_team', JSON.stringify(updated));
+      void addDocument('team', newMember).then((docRef) => {
+        setTeam((current) => current.map((member) => member.id === newMember.id ? { ...member, id: docRef.id } : member));
+      });
     }
     setIsTeamModalOpen(false);
   };
@@ -452,7 +488,7 @@ export default function AdminPanel({
     if (window.confirm('Retirer ce membre de l\'équipe ?')) {
       const updated = team.filter(t => t.id !== id);
       setTeam(updated);
-      localStorage.setItem('boutique_team', JSON.stringify(updated));
+      void deleteDocument('team', id);
     }
   };
 
@@ -489,7 +525,7 @@ export default function AdminPanel({
         date: t.date // Keep original date
       } : t);
       setTestimonials(updated);
-      localStorage.setItem('boutique_testimonials', JSON.stringify(updated));
+      void updateDocument('testimonials', editingTestimonial.id, updated.find(t => t.id === editingTestimonial.id));
     } else {
       const newTest: Testimonial = {
         id: 'test-' + Date.now(),
@@ -501,7 +537,9 @@ export default function AdminPanel({
       };
       const updated = [newTest, ...testimonials];
       setTestimonials(updated);
-      localStorage.setItem('boutique_testimonials', JSON.stringify(updated));
+      void addDocument('testimonials', newTest).then((docRef) => {
+        setTestimonials((current) => current.map((testimonial) => testimonial.id === newTest.id ? { ...testimonial, id: docRef.id } : testimonial));
+      });
     }
     setIsTestimonialModalOpen(false);
   };
@@ -510,7 +548,7 @@ export default function AdminPanel({
     if (window.confirm('Supprimer ce témoignage ?')) {
       const updated = testimonials.filter(t => t.id !== id);
       setTestimonials(updated);
-      localStorage.setItem('boutique_testimonials', JSON.stringify(updated));
+      void deleteDocument('testimonials', id);
     }
   };
 
@@ -539,8 +577,16 @@ export default function AdminPanel({
       notificationEmail: settingsNotifyEmail,
       notificationWhatsapp: settingsNotifyWhatsapp
     };
+    writeAdminCredentials(settingsUsername, newPasswordHash);
     setSettings(updated);
-    localStorage.setItem('boutique_settings', JSON.stringify(updated));
+    await updateDocument('settings', 'app', {
+      homepageBg: updated.homepageBg,
+      backgroundMusicUrl: updated.backgroundMusicUrl,
+      musicTitle: updated.musicTitle,
+      displayMode: updated.displayMode || 'auto',
+      notificationEmail: updated.notificationEmail,
+      notificationWhatsapp: updated.notificationWhatsapp,
+    });
     setSettingsPassword(''); // on revide le champ après enregistrement
     alert('Paramètres enregistrés avec succès ! Le site et les alarmes ont été mis à jour.');
   };

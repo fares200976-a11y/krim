@@ -9,6 +9,7 @@ import { motion, AnimatePresence } from 'motion/react';
 // Data and types
 import { Category, Dress, Booking, TeamMember, Testimonial, AppSettings, DefileVideo } from './types';
 import { INITIAL_DRESSES, INITIAL_TEAM, INITIAL_TESTIMONIALS, DEFAULT_SETTINGS, INITIAL_DEFILES } from './initialData';
+import { loadCollection, saveCollection, subscribeCollection, updateDocument } from './firebaseSync';
 
 // Components
 import AudioPlayer from './components/AudioPlayer';
@@ -16,8 +17,30 @@ import DressModal from './components/DressModal';
 import CheckoutModal from './components/CheckoutModal';
 import AdminPanel from './components/AdminPanel';
 
+const normalizeSettings = (value?: Partial<AppSettings> | null): AppSettings => {
+  const merged: AppSettings = {
+    ...DEFAULT_SETTINGS,
+    ...(value ?? {})
+  };
+
+  const leakedLegacyPasswords = ['admin123', 'karim2026', 'karim123456'];
+  if (!merged.adminUsername || merged.adminUsername === 'karim' || leakedLegacyPasswords.includes(merged.adminPasswordHash)) {
+    merged.adminUsername = '';
+    merged.adminPasswordHash = '';
+  }
+
+  if (!merged.notificationEmail) merged.notificationEmail = DEFAULT_SETTINGS.notificationEmail;
+  if (!merged.notificationWhatsapp) merged.notificationWhatsapp = DEFAULT_SETTINGS.notificationWhatsapp;
+
+  if (!merged.homepageBg || merged.homepageBg === 'https://images.unsplash.com/photo-1549417229-aa67d3263c09?auto=format&fit=crop&w=1920&q=80') {
+    merged.homepageBg = DEFAULT_SETTINGS.homepageBg;
+  }
+
+  merged.displayMode = merged.displayMode || 'auto';
+  return merged;
+};
+
 export default function App() {
-  // --- Persistent States from LocalStorage ---
   const [dresses, setDresses] = useState<Dress[]>([]);
   const [bookings, setBookings] = useState<Booking[]>([]);
   const [team, setTeam] = useState<TeamMember[]>([]);
@@ -25,110 +48,80 @@ export default function App() {
   const [defileVideos, setDefileVideos] = useState<DefileVideo[]>([]);
   const [settings, setSettings] = useState<AppSettings>(DEFAULT_SETTINGS);
 
-  // Initialize data
   useEffect(() => {
-    // Settings
-    const localSettings = localStorage.getItem('boutique_settings');
-    if (localSettings) {
-      try {
-        const parsed = JSON.parse(localSettings);
-        // Security: if this browser still has an old, publicly-known legacy
-        // password (from a previous version of this template), wipe it so the
-        // admin is forced through the "create your admin account" setup
-        // screen instead of silently falling back to a known credential.
-        const leakedLegacyPasswords = ['admin123', 'karim2026', 'karim123456'];
-        if (!parsed.adminUsername || parsed.adminUsername === 'karim' || leakedLegacyPasswords.includes(parsed.adminPasswordHash)) {
-          parsed.adminUsername = '';
-          parsed.adminPasswordHash = '';
-        }
-        // Ensure notification parameters are also merged
-        if (!parsed.notificationEmail) parsed.notificationEmail = DEFAULT_SETTINGS.notificationEmail;
-        if (!parsed.notificationWhatsapp) parsed.notificationWhatsapp = DEFAULT_SETTINGS.notificationWhatsapp;
-        
-        // Migrate old static homepage background image to new default video
-        if (!parsed.homepageBg || parsed.homepageBg === 'https://images.unsplash.com/photo-1549417229-aa67d3263c09?auto=format&fit=crop&w=1920&q=80') {
-          parsed.homepageBg = DEFAULT_SETTINGS.homepageBg;
-        }
-        
-        const merged = { ...DEFAULT_SETTINGS, ...parsed };
-        setSettings(merged);
-        localStorage.setItem('boutique_settings', JSON.stringify(merged));
-      } catch (e) {
-        setSettings(DEFAULT_SETTINGS);
-        localStorage.setItem('boutique_settings', JSON.stringify(DEFAULT_SETTINGS));
+    const seedCollection = async <T extends { id: string }>(collectionName: string, fallbackData: T[]) => {
+      const data = await loadCollection<T>(collectionName);
+      if (data.length === 0 && fallbackData.length > 0) {
+        await saveCollection(collectionName, fallbackData);
+        return fallbackData;
       }
-    } else {
-      localStorage.setItem('boutique_settings', JSON.stringify(DEFAULT_SETTINGS));
-    }
+      return data;
+    };
 
-    // Dresses
-    const localDresses = localStorage.getItem('boutique_dresses');
-    if (localDresses) {
-      setDresses(JSON.parse(localDresses));
-    } else {
-      setDresses(INITIAL_DRESSES);
-      localStorage.setItem('boutique_dresses', JSON.stringify(INITIAL_DRESSES));
-    }
+    const sampleBookings: Booking[] = [
+      {
+        id: 'b-sample-1',
+        dressId: 'mari-01',
+        dressName: 'Robe Céleste - Princesse Dentelle',
+        dressImage: 'https://images.unsplash.com/photo-1594552072238-b8a33785b261?auto=format&fit=crop&w=800&q=80',
+        customerName: 'Nassima Ait-Said',
+        customerPhone: '0555981243',
+        customerEmail: 'nassima@gmail.com',
+        date: '2026-08-15',
+        size: '38',
+        status: 'confirmed',
+        depositPaid: true,
+        depositAmount: 15000,
+        createdAt: new Date().toISOString()
+      }
+    ];
 
-    // Bookings
-    const localBookings = localStorage.getItem('boutique_bookings');
-    if (localBookings) {
-      setBookings(JSON.parse(localBookings));
-    } else {
-      // Empty by default or with a sample
-      const sampleBookings: Booking[] = [
-        {
-          id: 'b-sample-1',
-          dressId: 'mari-01',
-          dressName: 'Robe Céleste - Princesse Dentelle',
-          dressImage: 'https://images.unsplash.com/photo-1594552072238-b8a33785b261?auto=format&fit=crop&w=800&q=80',
-          customerName: 'Nassima Ait-Said',
-          customerPhone: '0555981243',
-          customerEmail: 'nassima@gmail.com',
-          date: '2026-08-15',
-          size: '38',
-          status: 'confirmed',
-          depositPaid: true,
-          depositAmount: 15000,
-          createdAt: new Date().toISOString()
-        }
-      ];
-      setBookings(sampleBookings);
-      localStorage.setItem('boutique_bookings', JSON.stringify(sampleBookings));
-    }
+    const loadData = async () => {
+      const [dressesData, bookingsData, teamData, testimonialsData, videosData, settingsData] = await Promise.all([
+        seedCollection<Dress>('dresses', INITIAL_DRESSES),
+        seedCollection<Booking>('bookings', sampleBookings),
+        seedCollection<TeamMember>('team', INITIAL_TEAM),
+        seedCollection<Testimonial>('testimonials', INITIAL_TESTIMONIALS),
+        seedCollection<DefileVideo>('videos', INITIAL_DEFILES),
+        seedCollection<AppSettings>('settings', [{ id: 'app', ...normalizeSettings(DEFAULT_SETTINGS) } as AppSettings & { id: string }])
+      ]);
 
-    // Team
-    const localTeam = localStorage.getItem('boutique_team');
-    if (localTeam) {
-      setTeam(JSON.parse(localTeam));
-    } else {
-      setTeam(INITIAL_TEAM);
-      localStorage.setItem('boutique_team', JSON.stringify(INITIAL_TEAM));
-    }
+      setDresses(dressesData);
+      setBookings(bookingsData);
+      setTeam(teamData);
+      setTestimonials(testimonialsData);
+      setDefileVideos(videosData);
 
-    // Testimonials
-    const localTestimonials = localStorage.getItem('boutique_testimonials');
-    if (localTestimonials) {
-      setTestimonials(JSON.parse(localTestimonials));
-    } else {
-      setTestimonials(INITIAL_TESTIMONIALS);
-      localStorage.setItem('boutique_testimonials', JSON.stringify(INITIAL_TESTIMONIALS));
-    }
+      const nextSettings = normalizeSettings(settingsData[0] as AppSettings | undefined);
+      setSettings(nextSettings);
+      setDisplayMode(nextSettings.displayMode || 'auto');
+    };
 
-    // Defiles / Videos
-    const localDefileVideos = localStorage.getItem('boutique_defile_videos');
-    if (localDefileVideos) {
-      setDefileVideos(JSON.parse(localDefileVideos));
-    } else {
-      setDefileVideos(INITIAL_DEFILES);
-      localStorage.setItem('boutique_defile_videos', JSON.stringify(INITIAL_DEFILES));
-    }
+    const unsubscribeDresses = subscribeCollection<Dress>('dresses', (data) => setDresses(data));
+    const unsubscribeBookings = subscribeCollection<Booking>('bookings', (data) => setBookings(data));
+    const unsubscribeTeam = subscribeCollection<TeamMember>('team', (data) => setTeam(data));
+    const unsubscribeTestimonials = subscribeCollection<Testimonial>('testimonials', (data) => setTestimonials(data));
+    const unsubscribeVideos = subscribeCollection<DefileVideo>('videos', (data) => setDefileVideos(data));
+    const unsubscribeSettings = subscribeCollection<AppSettings>('settings', (data) => {
+      const nextSettings = normalizeSettings(data[0]);
+      setSettings(nextSettings);
+      setDisplayMode(nextSettings.displayMode || 'auto');
+    });
+
+    loadData().catch((error) => console.error('Failed to load Firestore data', error));
+
+    return () => {
+      unsubscribeDresses();
+      unsubscribeBookings();
+      unsubscribeTeam();
+      unsubscribeTestimonials();
+      unsubscribeVideos();
+      unsubscribeSettings();
+    };
   }, []);
 
   // --- Display Mode State & Device Auto-Detection ---
-  const [displayMode, setDisplayMode] = useState<'auto' | 'pc' | 'mobile'>(() => {
-    return (localStorage.getItem('boutique_display_mode') as 'auto' | 'pc' | 'mobile') || 'auto';
-  });
+  const [displayMode, setDisplayMode] = useState<'auto' | 'pc' | 'mobile'>('auto');
   const [isMobileDevice, setIsMobileDevice] = useState(false);
 
   useEffect(() => {
@@ -144,7 +137,9 @@ export default function App() {
 
   const handleSetDisplayMode = (mode: 'auto' | 'pc' | 'mobile') => {
     setDisplayMode(mode);
-    localStorage.setItem('boutique_display_mode', mode);
+    const nextSettings: AppSettings = { ...settings, displayMode: mode };
+    setSettings(nextSettings);
+    void updateDocument('settings', 'app', nextSettings);
   };
 
   const isMobileLayout = displayMode === 'mobile' || (displayMode === 'auto' && isMobileDevice);
@@ -275,7 +270,7 @@ export default function App() {
 
     const updatedBookings = [newBooking, ...bookings];
     setBookings(updatedBookings);
-    localStorage.setItem('boutique_bookings', JSON.stringify(updatedBookings));
+    void updateDocument('bookings', newBooking.id, newBooking);
 
     // Reset modals
     setIsCheckoutOpen(false);

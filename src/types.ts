@@ -57,6 +57,7 @@ export interface AppSettings {
   homepageBg: string;
   backgroundMusicUrl: string;
   musicTitle: string;
+  displayMode?: 'auto' | 'pc' | 'mobile';
   adminUsername?: string; // Nom d'utilisateur de l'admin (karim)
   adminPasswordHash: string; // Hash SHA-256 du mot de passe admin (jamais stocké en clair)
   notificationEmail?: string; // Email d'alarme (karimchabni395@gmail.com)
