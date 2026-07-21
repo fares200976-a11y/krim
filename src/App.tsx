@@ -342,9 +342,10 @@ export default function App() {
             <button
               onClick={() => setIsAdminOpen(true)}
               id="admin-login-btn"
-              className="px-6 py-2 text-[10px] uppercase tracking-widest text-bento-gold border border-bento-gold/50 bg-white/40 hover:bg-bento-gold hover:text-white font-sans transition-all flex items-center gap-1.5 cursor-pointer shadow-xs"
+              className="p-2.5 text-bento-gold border border-bento-gold/50 bg-white/40 hover:bg-bento-gold hover:text-white transition-all flex items-center justify-center cursor-pointer shadow-xs rounded-none"
+              title="Espace Admin"
             >
-              <Lock className="w-3 h-3" /> Espace Admin
+              <Lock className="w-4 h-4" />
             </button>
             <a
               href="https://wa.me/213550123456?text=Bonjour%20Boutique%20Coup%20de%20Cœur,%20je%20souhaite%20prendre%20un%20rendez-vous%20de%20retouches%20ou%20de%20location."
@@ -385,15 +386,16 @@ export default function App() {
                 <div className="pt-4 border-t border-bento-gold/10 flex gap-2">
                   <button
                     onClick={() => { setMobileMenuOpen(false); setIsAdminOpen(true); }}
-                    className="flex-1 py-2 text-center text-[10px] font-sans uppercase tracking-widest text-bento-gold border border-bento-gold/30 rounded-none bg-white/40 flex items-center justify-center gap-1.5 cursor-pointer"
+                    className="p-3 text-bento-gold border border-bento-gold/30 rounded-none bg-white/40 flex items-center justify-center cursor-pointer"
+                    title="Admin"
                   >
-                    <Lock className="w-3.5 h-3.5" /> Admin
+                    <Lock className="w-4 h-4" />
                   </button>
                   <a
                     href="https://wa.me/213550123456?text=Bonjour%20Boutique%20Coup%20de%20Cœur,%20je%20souhaite%20louer%20une%20robe."
                     target="_blank"
                     referrerPolicy="no-referrer"
-                    className="flex-1 py-2 text-center text-[10px] font-sans uppercase tracking-widest text-white bg-bento-gold flex items-center justify-center gap-1.5 cursor-pointer shadow-xs rounded-none"
+                    className="flex-1 py-3 text-center text-[10px] font-sans uppercase tracking-widest text-white bg-bento-gold flex items-center justify-center gap-1.5 cursor-pointer shadow-xs rounded-none"
                   >
                     <MessageCircle className="w-3.5 h-3.5" /> WhatsApp
                   </a>
@@ -1056,9 +1058,10 @@ export default function App() {
             <span className="text-white/40 font-sans">Conçu de manière artisanale pour les mariées d'Algérie</span>
             <button
               onClick={() => setIsAdminOpen(true)}
-              className="text-white/40 hover:text-bento-gold transition-colors flex items-center gap-1.5 font-sans uppercase tracking-widest text-[9px] font-bold cursor-pointer"
+              className="text-white/20 hover:text-bento-gold transition-colors flex items-center justify-center p-2 cursor-pointer"
+              title="Administration"
             >
-              <Lock className="w-3.5 h-3.5 text-bento-gold" /> Accéder à l'Espace Administration Sécurisé
+              <Lock className="w-4 h-4 text-bento-gold" />
             </button>
           </div>
         </div>
@@ -1114,47 +1117,6 @@ export default function App() {
           isMobileLayout={isMobileLayout}
         />
       )}
-
-      {/* FLOATING DISPLAY MODE SELECTOR (Auto-Detect vs Manual PC/Mobile) */}
-      <div id="display-mode-selector" className="fixed bottom-4 left-4 z-40 bg-white/90 backdrop-blur-md border border-bento-gold/30 p-1 rounded-full shadow-lg flex items-center gap-1 transition-all hover:border-bento-gold">
-        <span className="text-[8px] uppercase tracking-[0.2em] text-bento-text/60 font-sans font-bold pl-3 pr-1.5 hidden sm:inline-block">
-          Affichage :
-        </span>
-        <button
-          onClick={() => handleSetDisplayMode('auto')}
-          className={`text-[9px] uppercase tracking-widest font-sans font-bold px-3 py-1.5 rounded-full transition-all cursor-pointer flex items-center gap-1 ${
-            displayMode === 'auto'
-              ? 'bg-bento-gold text-white shadow-xs'
-              : 'text-bento-text/70 hover:bg-bento-rose'
-          }`}
-          title="Détection automatique"
-        >
-          <span>✨ Auto</span>
-        </button>
-        <button
-          onClick={() => handleSetDisplayMode('pc')}
-          className={`text-[9px] uppercase tracking-widest font-sans font-bold px-3 py-1.5 rounded-full transition-all cursor-pointer flex items-center gap-1 ${
-            displayMode === 'pc'
-              ? 'bg-bento-gold text-white shadow-xs'
-              : 'text-bento-text/70 hover:bg-bento-rose'
-          }`}
-          title="Forcer la version PC"
-        >
-          <span>💻 PC</span>
-        </button>
-        <button
-          onClick={() => handleSetDisplayMode('mobile')}
-          className={`text-[9px] uppercase tracking-widest font-sans font-bold px-3 py-1.5 rounded-full transition-all cursor-pointer flex items-center gap-1 ${
-            displayMode === 'mobile'
-              ? 'bg-bento-gold text-white shadow-xs'
-              : 'text-bento-text/70 hover:bg-bento-rose'
-          }`}
-          title="Forcer la version Mobile"
-        >
-          <span>📱 Mobile</span>
-        </button>
-      </div>
-
     </div>
   );
 }

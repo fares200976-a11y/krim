@@ -8,7 +8,7 @@ interface AudioPlayerProps {
 }
 
 export default function AudioPlayer({ url, title }: AudioPlayerProps) {
-  const [isPlaying, setIsPlaying] = useState(false);
+  const [isPlaying, setIsPlaying] = useState(true);
   const [isMuted, setIsMuted] = useState(false);
   const [volume, setVolume] = useState(0.4);
   const audioRef = useRef<HTMLAudioElement | null>(null);
@@ -27,7 +27,6 @@ export default function AudioPlayer({ url, title }: AudioPlayerProps) {
     if (isPlaying) {
       audio.play().catch((err) => {
         console.log('Audio autoplay prevented by browser. Waiting for user interaction.', err);
-        setIsPlaying(false);
       });
     }
 
@@ -35,6 +34,42 @@ export default function AudioPlayer({ url, title }: AudioPlayerProps) {
       audio.pause();
     };
   }, [url]);
+
+  // Attempt to play on first user interaction to bypass browser autoplay policies
+  useEffect(() => {
+    const startAudioOnInteraction = () => {
+      if (audioRef.current && isPlaying) {
+        audioRef.current.play()
+          .then(() => {
+            cleanupListeners();
+          })
+          .catch((err) => {
+            console.log("Autoplay play attempt failed", err);
+          });
+      }
+    };
+
+    const cleanupListeners = () => {
+      window.removeEventListener('click', startAudioOnInteraction);
+      window.removeEventListener('touchstart', startAudioOnInteraction);
+      window.removeEventListener('scroll', startAudioOnInteraction);
+    };
+
+    window.addEventListener('click', startAudioOnInteraction);
+    window.addEventListener('touchstart', startAudioOnInteraction);
+    window.addEventListener('scroll', startAudioOnInteraction);
+
+    // Also attempt immediate play
+    if (audioRef.current && isPlaying) {
+      audioRef.current.play().then(() => {
+        cleanupListeners();
+      }).catch(() => {});
+    }
+
+    return () => {
+      cleanupListeners();
+    };
+  }, [isPlaying, url]);
 
   // Handle Play / Pause
   useEffect(() => {
