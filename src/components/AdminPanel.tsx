@@ -122,6 +122,31 @@ export default function AdminPanel({
   const [defileCoverImage, setDefileCoverImage] = useState('');
   const [defileAspectRatio, setDefileAspectRatio] = useState<'landscape' | 'portrait'>('landscape');
 
+  // Détecte si un fichier est au format HEIC/HEIF (format par défaut des
+  // photos iPhone), que les navigateurs ne savent pas afficher nativement.
+  // Certains navigateurs ne renseignent pas file.type pour le HEIC, d'où la
+  // vérification supplémentaire sur l'extension du nom de fichier.
+  const isHeicFile = (file: File): boolean => {
+    const type = (file.type || '').toLowerCase();
+    const name = file.name.toLowerCase();
+    return type === 'image/heic' || type === 'image/heif' || name.endsWith('.heic') || name.endsWith('.heif');
+  };
+
+  // Convertit un fichier HEIC/HEIF en JPEG dans le navigateur (via une petite
+  // librairie chargée à la demande) avant de le traiter normalement. Pour tout
+  // autre format, le fichier est renvoyé tel quel.
+  const toDisplayableImageFile = async (file: File): Promise<File | Blob> => {
+    if (!isHeicFile(file)) return file;
+    try {
+      const heic2any = (await import('heic2any')).default;
+      const converted = await heic2any({ blob: file, toType: 'image/jpeg', quality: 0.8 });
+      return Array.isArray(converted) ? converted[0] : converted;
+    } catch (error) {
+      console.error('Échec de la conversion HEIC → JPEG', error);
+      throw error;
+    }
+  };
+
   // Image compression utility to avoid LocalStorage quota exceed errors
   // ET pour rester sous la limite de 1 Mo par document Firestore (une robe
   // avec plusieurs photos base64 peut vite dépasser cette limite).
