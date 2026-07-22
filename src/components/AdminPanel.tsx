@@ -246,6 +246,13 @@ export default function AdminPanel({
         displayMode: updated.displayMode || 'auto',
         notificationEmail: updated.notificationEmail,
         notificationWhatsapp: updated.notificationWhatsapp,
+        // Important : on persiste aussi les identifiants admin dans Firestore.
+        // Sans ça, ils ne restaient que dans le localStorage du navigateur et
+        // App.tsx écrasait `settings` avec la version Firestore (sans identifiants)
+        // à chaque rechargement / abonnement temps réel, ce qui renvoyait sans
+        // cesse vers l'écran de création de compte.
+        adminUsername: updated.adminUsername,
+        adminPasswordHash: updated.adminPasswordHash,
       });
       setIsAuthenticated(true);
     } finally {
@@ -586,6 +593,11 @@ export default function AdminPanel({
       displayMode: updated.displayMode || 'auto',
       notificationEmail: updated.notificationEmail,
       notificationWhatsapp: updated.notificationWhatsapp,
+      // Voir la remarque dans handleSetupSubmit : il faut aussi persister les
+      // identifiants ici, sinon un changement de mot de passe est écrasé au
+      // rechargement suivant par la version Firestore (sans identifiants).
+      adminUsername: updated.adminUsername,
+      adminPasswordHash: updated.adminPasswordHash,
     });
     setSettingsPassword(''); // on revide le champ après enregistrement
     alert('Paramètres enregistrés avec succès ! Le site et les alarmes ont été mis à jour.');
