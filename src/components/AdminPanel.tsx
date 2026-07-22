@@ -123,7 +123,9 @@ export default function AdminPanel({
   const [defileAspectRatio, setDefileAspectRatio] = useState<'landscape' | 'portrait'>('landscape');
 
   // Image compression utility to avoid LocalStorage quota exceed errors
-  const compressBase64Image = (base64Str: string, maxWidth = 800, maxHeight = 800, quality = 0.7): Promise<string> => {
+  // ET pour rester sous la limite de 1 Mo par document Firestore (une robe
+  // avec plusieurs photos base64 peut vite dépasser cette limite).
+  const compressBase64Image = (base64Str: string, maxWidth = 700, maxHeight = 700, quality = 0.6): Promise<string | null> => {
     return new Promise((resolve) => {
       if (!base64Str.startsWith('data:image/')) {
         resolve(base64Str);
@@ -155,7 +157,11 @@ export default function AdminPanel({
         }
       };
       img.onerror = () => {
-        resolve(base64Str);
+        // Le navigateur n'a pas réussi à décoder l'image (ex : photo iPhone au
+        // format HEIC, non supporté par les navigateurs). On renvoie null pour
+        // que l'appelant puisse prévenir l'admin plutôt que d'enregistrer une
+        // image cassée sans le savoir.
+        resolve(null);
       };
     });
   };
@@ -195,12 +201,18 @@ export default function AdminPanel({
     setLoginBusy(true);
     setLoginError('');
     try {
-      const credentials = readAdminCredentials();
-      const expectedUser = credentials.adminUsername || '';
-      const expectedHash = credentials.adminPasswordHash || '';
+      // On vérifie d'abord contre `settings` (synchronisé depuis Firestore,
+      // donc valable sur n'importe quel appareil/navigateur), puis on retombe
+      // sur le localStorage local en dernier recours (compatibilité avec
+      // d'anciennes sessions qui n'auraient pas encore été migrées).
+      const localCredentials = readAdminCredentials();
+      const expectedUser = settings.adminUsername || localCredentials.adminUsername || '';
+      const expectedHash = settings.adminPasswordHash || localCredentials.adminPasswordHash || '';
       const enteredHash = await hashPassword(passwordInput);
 
       if (expectedHash && usernameInput.trim().toLowerCase() === expectedUser.toLowerCase() && enteredHash === expectedHash) {
+        // On remet à jour le localStorage local pour rester cohérent.
+        writeAdminCredentials(expectedUser, expectedHash);
         setIsAuthenticated(true);
       } else {
         setLoginError("Nom d'utilisateur ou mot de passe incorrect.");
@@ -337,7 +349,15 @@ export default function AdminPanel({
         available: dressAvailable
       } : d);
       setDresses(updated);
-      void updateDocument('dresses', editingDress.id, updated.find(d => d.id === editingDress.id));
+      const dressToSave = updated.find(d => d.id === editingDress.id);
+      updateDocument('dresses', editingDress.id, dressToSave)
+        .catch((error) => {
+          console.error('Échec de la sauvegarde de la robe sur Firestore', error);
+          alert(
+            "⚠️ La robe s'affiche ici mais n'a PAS pu être enregistrée sur le serveur (probablement des images trop volumineuses — la taille totale d'une robe est limitée à environ 1 Mo). " +
+            'Réduisez le nombre ou la taille des images et réessayez, sinon ce changement sera perdu au rechargement de la page.'
+          );
+        });
     } else {
       // Add
       const newDress: Dress = {
@@ -354,9 +374,17 @@ export default function AdminPanel({
       };
       const updated = [newDress, ...dresses];
       setDresses(updated);
-      void addDocument('dresses', newDress).then((docRef) => {
-        setDresses((current) => current.map((dress) => dress.id === newDress.id ? { ...dress, id: docRef.id } : dress));
-      });
+      addDocument('dresses', newDress)
+        .then((docRef) => {
+          setDresses((current) => current.map((dress) => dress.id === newDress.id ? { ...dress, id: docRef.id } : dress));
+        })
+        .catch((error) => {
+          console.error('Échec de la création de la robe sur Firestore', error);
+          alert(
+            "⚠️ La robe s'affiche ici mais n'a PAS pu être enregistrée sur le serveur (probablement des images trop volumineuses — la taille totale d'une robe est limitée à environ 1 Mo). " +
+            'Réduisez le nombre ou la taille des images et réessayez, sinon elle disparaîtra au rechargement de la page.'
+          );
+        });
     }
     setIsDressModalOpen(false);
   };
@@ -1885,23 +1913,40 @@ export default function AdminPanel({
                         onChange={(e) => {
                           const files = e.target.files;
                           if (files && files.length > 0) {
-                            const compressedBase64s: string[] = [];
-                            let loadedCount = 0;
-                            Array.from(files).forEach((file) => {
-                              const reader = new FileReader();
-                              reader.onload = async (event) => {
-                                if (event.target?.result) {
-                                  const compressed = await compressBase64Image(event.target.result as string, 800, 800, 0.7);
-                                  compressedBase64s.push(compressed);
-                                }
-                                loadedCount++;
-                                if (loadedCount === files.length) {
-                                  const currentImages = dressImages.trim();
-                                  const separator = currentImages ? ', ' : '';
-                                  setDressImages(currentImages + separator + compressedBase64s.join(', '));
-                                }
-                              };
-                              reader.readAsDataURL(file as any);
+                            const fileList = Array.from(files);
+                            Promise.all(
+                              fileList.map(
+                                (file) =>
+                                  new Promise<string | null>((resolveFile) => {
+                                    const reader = new FileReader();
+                                    reader.onload = async (event) => {
+                                      if (event.target?.result) {
+                                        const compressed = await compressBase64Image(event.target.result as string, 700, 700, 0.6);
+                                        resolveFile(compressed);
+                                      } else {
+                                        resolveFile(null);
+                                      }
+                                    };
+                                    reader.onerror = () => resolveFile(null);
+                                    reader.readAsDataURL(file as any);
+                                  })
+                              )
+                            ).then((results) => {
+                              const failedCount = results.filter((r) => r === null).length;
+                              const successResults = results.filter((r): r is string => r !== null);
+                              if (successResults.length > 0) {
+                                const currentImages = dressImages.trim();
+                                const separator = currentImages ? ', ' : '';
+                                setDressImages(currentImages + separator + successResults.join(', '));
+                              }
+                              if (failedCount > 0) {
+                                alert(
+                                  `⚠️ ${failedCount} photo(s) n'ont pas pu être traitées (format non supporté par le navigateur, ex. HEIC des iPhone). ` +
+                                  'Convertissez-les en JPG ou PNG avant de les importer.'
+                                );
+                              }
+                              // On réinitialise l'input pour permettre de resélectionner les mêmes fichiers si besoin.
+                              e.target.value = '';
                             });
                           }
                         }}
@@ -2262,8 +2307,12 @@ export default function AdminPanel({
                           const reader = new FileReader();
                           reader.onload = async (event) => {
                             if (event.target?.result) {
-                              const compressed = await compressBase64Image(event.target.result as string, 800, 800, 0.7);
-                              setDefileCoverImage(compressed);
+                              const compressed = await compressBase64Image(event.target.result as string, 700, 700, 0.6);
+                              if (compressed) {
+                                setDefileCoverImage(compressed);
+                              } else {
+                                alert("⚠️ Cette photo n'a pas pu être traitée (format non supporté par le navigateur, ex. HEIC des iPhone). Convertissez-la en JPG ou PNG avant de l'importer.");
+                              }
                             }
                           };
                           reader.readAsDataURL(file);
