@@ -139,7 +139,9 @@ export default function App() {
     setDisplayMode(mode);
     const nextSettings: AppSettings = { ...settings, displayMode: mode };
     setSettings(nextSettings);
-    void updateDocument('settings', 'app', nextSettings);
+    updateDocument('settings', 'app', nextSettings).catch((error) => {
+      console.error('Échec de la sauvegarde du mode d\'affichage sur Firestore', error);
+    });
   };
 
   const isMobileLayout = displayMode === 'mobile' || (displayMode === 'auto' && isMobileDevice);
@@ -270,7 +272,6 @@ export default function App() {
 
     const updatedBookings = [newBooking, ...bookings];
     setBookings(updatedBookings);
-    void updateDocument('bookings', newBooking.id, newBooking);
 
     // Reset modals
     setIsCheckoutOpen(false);
@@ -285,7 +286,24 @@ export default function App() {
     const fittingMessage = newBooking.fittingDate 
       ? ` et votre séance d'essai/test est planifiée pour le ${new Date(newBooking.fittingDate).toLocaleDateString('fr-FR')}`
       : '';
-    alert(`Félicitations ! Votre réservation ${dateRangeStr} a été confirmée avec succès${fittingMessage}. Notre équipe vous attend à la boutique de Tizi Ouzou !`);
+
+    // Important : on n'affiche le message de confirmation au client QUE si la
+    // réservation a bien été enregistrée sur le serveur. Avant ce correctif,
+    // le message de succès s'affichait systématiquement même si la sauvegarde
+    // échouait en arrière-plan (silencieusement) — la boutique ne recevait
+    // alors jamais la réservation, sans que le client ne s'en aperçoive.
+    updateDocument('bookings', newBooking.id, newBooking)
+      .then(() => {
+        alert(`Félicitations ! Votre réservation ${dateRangeStr} a été confirmée avec succès${fittingMessage}. Notre équipe vous attend à la boutique de Tizi Ouzou !`);
+      })
+      .catch((error) => {
+        console.error('Échec de l\'enregistrement de la réservation sur Firestore', error);
+        const contactPhone = settings.notificationWhatsapp || '';
+        alert(
+          `⚠️ Votre paiement a été pris en compte, mais un problème technique a empêché l'enregistrement de votre réservation sur notre système. ` +
+          `Merci de nous contacter immédiatement${contactPhone ? ` au ${contactPhone}` : ''} avec votre nom et la date souhaitée pour confirmer votre réservation manuellement.`
+        );
+      });
   };
 
   // --- Filter Dresses ---

@@ -7,8 +7,27 @@ import {
   onSnapshot,
   setDoc,
 } from "firebase/firestore";
+import { ref, uploadBytes, getDownloadURL } from "firebase/storage";
 
-import { db } from "./firebase";
+import { db, storage } from "./firebase";
+
+// Téléverse un fichier (photo, vidéo, audio) vers Firebase Storage et renvoie
+// son URL de téléchargement publique. C'est CETTE url (une simple chaîne de
+// caractères, quelques dizaines d'octets) qui est ensuite stockée dans le
+// document Firestore — jamais le fichier lui-même. Cela évite la limite
+// stricte de 1 Mo par document Firestore, qui faisait échouer silencieusement
+// l'enregistrement des photos et surtout des vidéos.
+export async function uploadFileToStorage(
+  file: File | Blob,
+  folder: string,
+  fileName?: string
+): Promise<string> {
+  const safeName = fileName || (file instanceof File ? file.name : `fichier-${Date.now()}`);
+  const path = `${folder}/${Date.now()}-${safeName.replace(/[^a-zA-Z0-9._-]/g, "_")}`;
+  const fileRef = ref(storage, path);
+  await uploadBytes(fileRef, file);
+  return getDownloadURL(fileRef);
+}
 
 export async function loadCollection<T>(collectionName: string): Promise<T[]> {
   const snapshot = await getDocs(collection(db, collectionName));
