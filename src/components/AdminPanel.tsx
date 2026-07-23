@@ -29,6 +29,31 @@ const writeAdminCredentials = (adminUsername: string, adminPasswordHash: string)
   localStorage.setItem(ADMIN_CREDENTIALS_KEY, JSON.stringify({ adminUsername, adminPasswordHash }));
 };
 
+// Session admin persistée : évite d'avoir à se reconnecter à chaque fois que
+// la page est rechargée ou que le panel admin est refermé/rouvert. La session
+// expire après 7 jours par sécurité (il faudra alors se reconnecter).
+const ADMIN_SESSION_KEY = 'boutique_admin_session';
+const SESSION_DURATION_MS = 7 * 24 * 60 * 60 * 1000; // 7 jours
+
+const hasValidAdminSession = (): boolean => {
+  try {
+    const raw = localStorage.getItem(ADMIN_SESSION_KEY);
+    if (!raw) return false;
+    const { timestamp } = JSON.parse(raw) as { timestamp: number };
+    return typeof timestamp === 'number' && Date.now() - timestamp < SESSION_DURATION_MS;
+  } catch {
+    return false;
+  }
+};
+
+const writeAdminSession = () => {
+  localStorage.setItem(ADMIN_SESSION_KEY, JSON.stringify({ timestamp: Date.now() }));
+};
+
+const clearAdminSession = () => {
+  localStorage.removeItem(ADMIN_SESSION_KEY);
+};
+
 // Hache le mot de passe avec SHA-256 (Web Crypto API) avant de le stocker ou
 // de le comparer, pour éviter de garder un mot de passe en clair dans le
 // localStorage du navigateur. Note : comme il n'y a pas de serveur, cela
@@ -72,7 +97,7 @@ export default function AdminPanel({
   setDisplayMode,
   isMobileLayout
 }: AdminPanelProps) {
-  const [isAuthenticated, setIsAuthenticated] = useState(false);
+  const [isAuthenticated, setIsAuthenticated] = useState(() => hasValidAdminSession());
   const [usernameInput, setUsernameInput] = useState('');
   const [passwordInput, setPasswordInput] = useState('');
   const [loginError, setLoginError] = useState('');
@@ -321,6 +346,7 @@ export default function AdminPanel({
       if (expectedHash && usernameInput.trim().toLowerCase() === expectedUser.toLowerCase() && enteredHash === expectedHash) {
         // On remet à jour le localStorage local pour rester cohérent.
         writeAdminCredentials(expectedUser, expectedHash);
+        writeAdminSession();
         setIsAuthenticated(true);
       } else {
         setLoginError("Nom d'utilisateur ou mot de passe incorrect.");
@@ -374,6 +400,7 @@ export default function AdminPanel({
         adminUsername: updated.adminUsername,
         adminPasswordHash: updated.adminPasswordHash,
       });
+      writeAdminSession();
       setIsAuthenticated(true);
     } finally {
       setSetupBusy(false);
@@ -1154,7 +1181,7 @@ export default function AdminPanel({
         {/* Footer Actions - collapsed on mobile by default */}
         <div className={`p-4 border-t border-bento-gold/15 space-y-2 ${!isMobileLayout || isMobileNavOpen ? 'block' : 'hidden'}`}>
           <button
-            onClick={() => setIsAuthenticated(false)}
+            onClick={() => { clearAdminSession(); setIsAuthenticated(false); }}
             className="w-full text-left px-4 py-2.5 rounded-none text-[9px] uppercase tracking-widest font-sans font-bold text-rose-400 hover:bg-rose-500/10 transition-colors flex items-center gap-2 cursor-pointer"
           >
             <LogOut className="w-3.5 h-3.5" /> Déconnexion Admin
