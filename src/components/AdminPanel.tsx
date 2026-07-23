@@ -392,7 +392,7 @@ export default function AdminPanel({
     const updated = bookings.map(b => b.id === id ? { ...b, status: newStatus } : b);
     setBookings(updated);
     saveCollection('bookings', updated).catch((error) => {
-      console.error('Échec de la mise à jour de la réservation sur Firestore', error);
+      console.error('Échec de la mise à jour de la réservation sur Supabase', error);
       alert("⚠️ Le statut s'affiche ici mais n'a PAS pu être enregistré sur le serveur. Vérifiez votre connexion et réessayez, sinon ce changement sera perdu au rechargement de la page.");
     });
   };
@@ -402,7 +402,7 @@ export default function AdminPanel({
       const updated = bookings.filter(b => b.id !== id);
       setBookings(updated);
       deleteDocument('bookings', id).catch((error) => {
-        console.error('Échec de la suppression de la réservation sur Firestore', error);
+        console.error('Échec de la suppression de la réservation sur Supabase', error);
         alert("⚠️ Échec de la suppression sur le serveur. Vérifiez votre connexion et réessayez.");
         setBookings(bookings);
       });
@@ -467,10 +467,10 @@ export default function AdminPanel({
       const dressToSave = updated.find(d => d.id === editingDress.id);
       updateDocument('dresses', editingDress.id, dressToSave)
         .catch((error) => {
-          console.error('Échec de la sauvegarde de la robe sur Firestore', error);
+          console.error('Échec de la sauvegarde de la robe sur Supabase', error);
           alert(
-            "⚠️ La robe s'affiche ici mais n'a PAS pu être enregistrée sur le serveur (probablement des images trop volumineuses — la taille totale d'une robe est limitée à environ 1 Mo). " +
-            'Réduisez le nombre ou la taille des images et réessayez, sinon ce changement sera perdu au rechargement de la page.'
+            "⚠️ La robe s'affiche ici mais n'a PAS pu être enregistrée sur le serveur.\n\nDétail technique : " + (error?.message || error) +
+            '\n\nCe changement sera perdu au rechargement de la page tant que ce n\'est pas corrigé.'
           );
         });
     } else {
@@ -494,10 +494,10 @@ export default function AdminPanel({
           setDresses((current) => current.map((dress) => dress.id === newDress.id ? { ...dress, id: docRef.id } : dress));
         })
         .catch((error) => {
-          console.error('Échec de la création de la robe sur Firestore', error);
+          console.error('Échec de la création de la robe sur Supabase', error);
           alert(
-            "⚠️ La robe s'affiche ici mais n'a PAS pu être enregistrée sur le serveur (probablement des images trop volumineuses — la taille totale d'une robe est limitée à environ 1 Mo). " +
-            'Réduisez le nombre ou la taille des images et réessayez, sinon elle disparaîtra au rechargement de la page.'
+            "⚠️ La robe s'affiche ici mais n'a PAS pu être enregistrée sur le serveur.\n\nDétail technique : " + (error?.message || error) +
+            '\n\nElle disparaîtra au rechargement de la page tant que ce n\'est pas corrigé.'
           );
         });
     }
@@ -509,7 +509,7 @@ export default function AdminPanel({
       const updated = dresses.filter(d => d.id !== id);
       setDresses(updated);
       deleteDocument('dresses', id).catch((error) => {
-        console.error('Échec de la suppression de la robe sur Firestore', error);
+        console.error('Échec de la suppression de la robe sur Supabase', error);
         alert("⚠️ Échec de la suppression sur le serveur. Vérifiez votre connexion et réessayez.");
         setDresses(dresses);
       });
@@ -557,7 +557,7 @@ export default function AdminPanel({
       setDefileVideos(updated);
       updateDocument('videos', editingDefile.id, updated.find(v => v.id === editingDefile.id))
         .catch((error) => {
-          console.error('Échec de la sauvegarde de la vidéo de défilé sur Firestore', error);
+          console.error('Échec de la sauvegarde de la vidéo de défilé sur Supabase', error);
           alert("⚠️ La vidéo s'affiche ici mais n'a PAS pu être enregistrée sur le serveur. Vérifiez votre connexion et réessayez, sinon ce changement sera perdu au rechargement de la page.");
         });
     } else {
@@ -577,7 +577,7 @@ export default function AdminPanel({
           setDefileVideos((current) => current.map((video) => video.id === newDefile.id ? { ...video, id: docRef.id } : video));
         })
         .catch((error) => {
-          console.error('Échec de la création de la vidéo de défilé sur Firestore', error);
+          console.error('Échec de la création de la vidéo de défilé sur Supabase', error);
           alert("⚠️ La vidéo s'affiche ici mais n'a PAS pu être enregistrée sur le serveur. Vérifiez votre connexion et réessayez, sinon elle disparaîtra au rechargement de la page.");
         });
     }
@@ -589,7 +589,7 @@ export default function AdminPanel({
       const updated = defileVideos.filter(v => v.id !== id);
       setDefileVideos(updated);
       deleteDocument('videos', id).catch((error) => {
-        console.error('Échec de la suppression de la vidéo sur Firestore', error);
+        console.error('Échec de la suppression de la vidéo sur Supabase', error);
         alert("⚠️ Échec de la suppression sur le serveur. Vérifiez votre connexion et réessayez.");
         setDefileVideos(defileVideos);
       });
@@ -634,7 +634,7 @@ export default function AdminPanel({
       setTeam(updated);
       updateDocument('team', editingTeam.id, updated.find(t => t.id === editingTeam.id))
         .catch((error) => {
-          console.error('Échec de la sauvegarde du membre sur Firestore', error);
+          console.error('Échec de la sauvegarde du membre sur Supabase', error);
           alert("⚠️ Ce membre s'affiche ici mais n'a PAS pu être enregistré sur le serveur. Vérifiez votre connexion et réessayez, sinon ce changement sera perdu au rechargement de la page.");
         });
     } else {
@@ -653,7 +653,7 @@ export default function AdminPanel({
           setTeam((current) => current.map((member) => member.id === newMember.id ? { ...member, id: docRef.id } : member));
         })
         .catch((error) => {
-          console.error('Échec de la création du membre sur Firestore', error);
+          console.error('Échec de la création du membre sur Supabase', error);
           alert("⚠️ Ce membre s'affiche ici mais n'a PAS pu être enregistré sur le serveur. Vérifiez votre connexion et réessayez, sinon il disparaîtra au rechargement de la page.");
         });
     }
@@ -665,7 +665,7 @@ export default function AdminPanel({
       const updated = team.filter(t => t.id !== id);
       setTeam(updated);
       deleteDocument('team', id).catch((error) => {
-        console.error('Échec de la suppression du membre sur Firestore', error);
+        console.error('Échec de la suppression du membre sur Supabase', error);
         alert("⚠️ Échec de la suppression sur le serveur. Vérifiez votre connexion et réessayez.");
         setTeam(team);
       });
@@ -707,7 +707,7 @@ export default function AdminPanel({
       setTestimonials(updated);
       updateDocument('testimonials', editingTestimonial.id, updated.find(t => t.id === editingTestimonial.id))
         .catch((error) => {
-          console.error('Échec de la sauvegarde du témoignage sur Firestore', error);
+          console.error('Échec de la sauvegarde du témoignage sur Supabase', error);
           alert("⚠️ Ce témoignage s'affiche ici mais n'a PAS pu être enregistré sur le serveur. Vérifiez votre connexion et réessayez, sinon ce changement sera perdu au rechargement de la page.");
         });
     } else {
@@ -726,7 +726,7 @@ export default function AdminPanel({
           setTestimonials((current) => current.map((testimonial) => testimonial.id === newTest.id ? { ...testimonial, id: docRef.id } : testimonial));
         })
         .catch((error) => {
-          console.error('Échec de la création du témoignage sur Firestore', error);
+          console.error('Échec de la création du témoignage sur Supabase', error);
           alert("⚠️ Ce témoignage s'affiche ici mais n'a PAS pu être enregistré sur le serveur. Vérifiez votre connexion et réessayez, sinon il disparaîtra au rechargement de la page.");
         });
     }
@@ -738,7 +738,7 @@ export default function AdminPanel({
       const updated = testimonials.filter(t => t.id !== id);
       setTestimonials(updated);
       deleteDocument('testimonials', id).catch((error) => {
-        console.error('Échec de la suppression du témoignage sur Firestore', error);
+        console.error('Échec de la suppression du témoignage sur Supabase', error);
         alert("⚠️ Échec de la suppression sur le serveur. Vérifiez votre connexion et réessayez.");
         setTestimonials(testimonials);
       });
