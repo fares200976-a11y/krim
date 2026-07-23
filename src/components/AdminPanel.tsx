@@ -7,6 +7,7 @@ import {
 import { motion } from 'motion/react';
 import { Dress, Booking, TeamMember, Testimonial, AppSettings, Category, DefileVideo } from '../types';
 import { addDocument, deleteDocument, saveCollection, updateDocument, uploadFileToStorage } from '../firebaseSync';
+import { migrateFromFirestore, MigrationResult } from '../migrateFromFirestore';
 
 const ADMIN_CREDENTIALS_KEY = 'boutique_admin_credentials';
 
@@ -108,6 +109,33 @@ export default function AdminPanel({
   };
   const setUploadPercent = (field: string, percent: number) => {
     setUploadProgress(prev => (field in prev ? { ...prev, [field]: percent } : prev));
+  };
+
+  // Outil de migration ponctuel Firestore → Supabase (voir migrateFromFirestore.ts)
+  const [isMigrating, setIsMigrating] = useState(false);
+  const [migrationLog, setMigrationLog] = useState<string[]>([]);
+  const [migrationResults, setMigrationResults] = useState<MigrationResult[] | null>(null);
+
+  const handleMigrate = async () => {
+    if (!window.confirm(
+      "Ceci va copier toutes vos données existantes (réservations, robes, équipe, témoignages, vidéos, paramètres) depuis l'ancienne base Firestore vers les nouvelles tables Supabase.\n\n" +
+      "Assurez-vous d'avoir bien exécuté le script supabase-schema.sql dans Supabase avant de continuer.\n\n" +
+      "Cette opération est sans danger à relancer plusieurs fois. Continuer ?"
+    )) return;
+
+    setIsMigrating(true);
+    setMigrationLog([]);
+    setMigrationResults(null);
+    try {
+      const results = await migrateFromFirestore((message) => {
+        setMigrationLog((prev) => [...prev, message]);
+      });
+      setMigrationResults(results);
+    } catch (error: any) {
+      setMigrationLog((prev) => [...prev, `⚠️ Erreur générale : ${error.message || error}`]);
+    } finally {
+      setIsMigrating(false);
+    }
   };
 
   // Navigation tabs: 'bookings' | 'dresses' | 'defile_videos' | 'settings' | 'team_testimonials'
@@ -1612,7 +1640,39 @@ export default function AdminPanel({
 
           {/* TAB 3: PERSONALIZATION & BACKGROUNDS */}
           {activeTab === 'settings' && (
-            <div className="max-w-2xl bg-white p-6 rounded-2xl border border-zinc-100 shadow-sm space-y-6">
+            <div className="max-w-2xl space-y-6">
+              {/* Outil de migration ponctuel Firestore → Supabase */}
+              <div className="bg-amber-50 border border-amber-200 p-6 rounded-2xl space-y-4">
+                <div className="border-b border-amber-200 pb-3">
+                  <h3 className="font-serif font-bold text-zinc-800 text-lg">🔄 Migration des données (Firestore → Supabase)</h3>
+                  <p className="text-xs text-zinc-500 mt-1">
+                    À utiliser UNE FOIS pour récupérer vos réservations, robes, équipe, témoignages et vidéos déjà enregistrés avant le changement de système de base de données.
+                    Sans danger à relancer plusieurs fois.
+                  </p>
+                </div>
+                <button
+                  type="button"
+                  onClick={handleMigrate}
+                  disabled={isMigrating}
+                  className="bg-amber-600 hover:bg-amber-700 disabled:opacity-60 text-white px-4 py-2.5 text-sm font-bold rounded-lg"
+                >
+                  {isMigrating ? 'Migration en cours...' : 'Lancer la migration des anciennes données'}
+                </button>
+                {migrationLog.length > 0 && (
+                  <div className="bg-white border border-zinc-200 rounded-lg p-3 text-xs font-mono text-zinc-600 max-h-48 overflow-y-auto space-y-1">
+                    {migrationLog.map((line, i) => <div key={i}>{line}</div>)}
+                  </div>
+                )}
+                {migrationResults && (
+                  <div className="text-xs text-zinc-600">
+                    {migrationResults.some(r => r.error)
+                      ? '⚠️ Certaines tables ont échoué — vérifiez que le script supabase-schema.sql a bien été exécuté.'
+                      : '✓ Migration terminée. Vérifiez vos données dans les autres onglets.'}
+                  </div>
+                )}
+              </div>
+
+              <div className="max-w-2xl bg-white p-6 rounded-2xl border border-zinc-100 shadow-sm space-y-6">
               <div className="border-b border-zinc-100 pb-3 flex items-center gap-2">
                 <Sparkles className="w-5 h-5 text-gold-500" />
                 <h3 className="font-serif font-bold text-zinc-800 text-lg">Personnaliser le Site</h3>
@@ -1818,6 +1878,7 @@ export default function AdminPanel({
                   Enregistrer les configurations générales & alarmes
                 </button>
               </form>
+              </div>
             </div>
           )}
 

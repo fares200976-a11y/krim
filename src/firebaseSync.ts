@@ -1,39 +1,29 @@
 import { supabase } from './lib/supabase';
 
-// Uploads a file (photo, video, audio) to Cloudinary and returns its URL.
-// The URL (a simple string) is then stored in the Supabase document — never 
-// the file itself. This avoids the strict 1 MB per document limit that would
-// cause silent failures with photos and especially videos.
+// Téléverse un fichier (photo, vidéo, audio) vers Supabase Storage (bucket
+// "media") et renvoie son URL publique. C'est CETTE url (une simple chaîne de
+// caractères) qui est ensuite stockée dans la table Supabase — jamais le
+// fichier lui-même. Gratuit jusqu'à 1 Go de stockage / 2 Go de bande passante
+// par mois, sans carte bancaire requise.
 //
-// onProgress (optional) is called regularly with a percentage (0-100) to display
-// a real progress bar during upload — useful for videos/audio that may take time.
+// onProgress (optionnel) est appelé régulièrement avec un pourcentage (0-100),
+// pour afficher une vraie barre de progression pendant l'envoi.
 export async function uploadFileToStorage(
   file: File | Blob,
   folder: string,
   fileName?: string,
   onProgress?: (percent: number) => void
 ): Promise<string> {
-  const cloudinaryUrl = import.meta.env.VITE_CLOUDINARY_URL;
-  const cloudinaryUploadPreset = import.meta.env.VITE_CLOUDINARY_UPLOAD_PRESET;
-
-  if (!cloudinaryUrl || !cloudinaryUploadPreset) {
-    throw new Error(
-      'Cloudinary configuration is missing. Please set VITE_CLOUDINARY_URL and VITE_CLOUDINARY_UPLOAD_PRESET environment variables.'
-    );
-  }
-
-  const formData = new FormData();
-  formData.append('file', file);
-  formData.append('upload_preset', cloudinaryUploadPreset);
-  formData.append('folder', `karim/${folder}`);
-
   const safeName = fileName || (file instanceof File ? file.name : `fichier-${Date.now()}`);
-  formData.append('public_id', `${Date.now()}-${safeName.replace(/[^a-zA-Z0-9._-]/g, '_')}`);
+  const path = `${folder}/${Date.now()}-${safeName.replace(/[^a-zA-Z0-9._-]/g, '_')}`;
+
+  const supabaseUrl = import.meta.env.VITE_SUPABASE_URL as string;
+  const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY as string;
+  const uploadUrl = `${supabaseUrl}/storage/v1/object/media/${path}`;
 
   return new Promise((resolve, reject) => {
     const xhr = new XMLHttpRequest();
 
-    // Track upload progress
     xhr.upload.addEventListener('progress', (e) => {
       if (onProgress && e.total > 0) {
         onProgress(Math.round((e.loaded / e.total) * 100));
@@ -41,28 +31,28 @@ export async function uploadFileToStorage(
     });
 
     xhr.addEventListener('load', () => {
-      if (xhr.status === 200) {
-        try {
-          const response = JSON.parse(xhr.responseText);
-          resolve(response.secure_url);
-        } catch (err) {
-          reject(new Error('Failed to parse Cloudinary response'));
-        }
+      if (xhr.status >= 200 && xhr.status < 300) {
+        const { data } = supabase.storage.from('media').getPublicUrl(path);
+        resolve(data.publicUrl);
       } else {
-        reject(new Error(`Cloudinary upload failed with status ${xhr.status}`));
+        reject(new Error(`Échec de l'envoi vers Supabase Storage (code ${xhr.status}): ${xhr.responseText}`));
       }
     });
 
     xhr.addEventListener('error', () => {
-      reject(new Error('Cloudinary upload failed'));
+      reject(new Error('Échec de l\'envoi vers Supabase Storage (erreur réseau).'));
     });
 
     xhr.addEventListener('abort', () => {
-      reject(new Error('Cloudinary upload was aborted'));
+      reject(new Error('Envoi annulé.'));
     });
 
-    xhr.open('POST', cloudinaryUrl, true);
-    xhr.send(formData);
+    xhr.open('POST', uploadUrl, true);
+    xhr.setRequestHeader('Authorization', `Bearer ${supabaseAnonKey}`);
+    xhr.setRequestHeader('apikey', supabaseAnonKey);
+    const contentType = file instanceof File ? file.type || 'application/octet-stream' : 'application/octet-stream';
+    xhr.setRequestHeader('Content-Type', contentType);
+    xhr.send(file);
   });
 }
 
@@ -72,7 +62,7 @@ export async function loadCollection<T>(collectionName: string): Promise<T[]> {
     .select('*');
 
   if (error) {
-    throw new Error(`Failed to load collection "${collectionName}": ${error.message}`);
+    throw new Error(`Échec du chargement de "${collectionName}": ${error.message}`);
   }
 
   return (data || []) as T[];
@@ -82,24 +72,26 @@ export function subscribeCollection<T>(
   collectionName: string,
   callback: (data: T[]) => void
 ) {
-  const subscription = supabase
-    .from(collectionName)
-    .on('*', (payload) => {
-      // Fetch fresh data on any change to ensure consistency
-      supabase
-        .from(collectionName)
-        .select('*')
-        .then(({ data, error }) => {
-          if (!error && data) {
-            callback(data as T[]);
-          }
-        });
-    })
+  const channel = supabase
+    .channel(`realtime:${collectionName}`)
+    .on(
+      'postgres_changes',
+      { event: '*', schema: 'public', table: collectionName },
+      () => {
+        supabase
+          .from(collectionName)
+          .select('*')
+          .then(({ data, error }) => {
+            if (!error && data) {
+              callback(data as T[]);
+            }
+          });
+      }
+    )
     .subscribe();
 
-  // Return unsubscribe function
   return () => {
-    supabase.removeSubscription(subscription);
+    supabase.removeChannel(channel);
   };
 }
 
@@ -113,7 +105,7 @@ export async function addDocument(
     .select();
 
   if (error) {
-    throw new Error(`Failed to add document to "${collectionName}": ${error.message}`);
+    throw new Error(`Échec de l'ajout dans "${collectionName}": ${error.message}`);
   }
 
   return insertedData?.[0];
@@ -131,7 +123,7 @@ export async function updateDocument(
     .select();
 
   if (error) {
-    throw new Error(`Failed to update document in "${collectionName}": ${error.message}`);
+    throw new Error(`Échec de la mise à jour dans "${collectionName}": ${error.message}`);
   }
 
   return updatedData?.[0];
@@ -147,7 +139,7 @@ export async function deleteDocument(
     .eq('id', id);
 
   if (error) {
-    throw new Error(`Failed to delete document from "${collectionName}": ${error.message}`);
+    throw new Error(`Échec de la suppression dans "${collectionName}": ${error.message}`);
   }
 }
 
@@ -155,13 +147,12 @@ export async function saveCollection(
   collectionName: string,
   data: any[]
 ) {
-  for (const item of data) {
-    const { error } = await supabase
-      .from(collectionName)
-      .upsert([item], { onConflict: 'id' });
+  if (data.length === 0) return;
+  const { error } = await supabase
+    .from(collectionName)
+    .upsert(data, { onConflict: 'id' });
 
-    if (error) {
-      throw new Error(`Failed to save item to "${collectionName}": ${error.message}`);
-    }
+  if (error) {
+    throw new Error(`Échec de l'enregistrement dans "${collectionName}": ${error.message}`);
   }
 }
