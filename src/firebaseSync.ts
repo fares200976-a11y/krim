@@ -7,7 +7,7 @@ import {
   onSnapshot,
   setDoc,
 } from "firebase/firestore";
-import { ref, uploadBytes, getDownloadURL } from "firebase/storage";
+import { ref, uploadBytesResumable, getDownloadURL } from "firebase/storage";
 
 import { db, storage } from "./firebase";
 
@@ -17,16 +17,40 @@ import { db, storage } from "./firebase";
 // document Firestore — jamais le fichier lui-même. Cela évite la limite
 // stricte de 1 Mo par document Firestore, qui faisait échouer silencieusement
 // l'enregistrement des photos et surtout des vidéos.
+//
+// onProgress (optionnel) est appelé régulièrement avec un pourcentage (0-100),
+// pour afficher une vraie barre de progression pendant l'envoi — utile pour
+// les vidéos/audio qui peuvent prendre du temps selon la connexion.
 export async function uploadFileToStorage(
   file: File | Blob,
   folder: string,
-  fileName?: string
+  fileName?: string,
+  onProgress?: (percent: number) => void
 ): Promise<string> {
   const safeName = fileName || (file instanceof File ? file.name : `fichier-${Date.now()}`);
   const path = `${folder}/${Date.now()}-${safeName.replace(/[^a-zA-Z0-9._-]/g, "_")}`;
   const fileRef = ref(storage, path);
-  await uploadBytes(fileRef, file);
-  return getDownloadURL(fileRef);
+
+  return new Promise((resolve, reject) => {
+    const task = uploadBytesResumable(fileRef, file);
+    task.on(
+      "state_changed",
+      (snapshot) => {
+        if (onProgress && snapshot.totalBytes > 0) {
+          onProgress(Math.round((snapshot.bytesTransferred / snapshot.totalBytes) * 100));
+        }
+      },
+      (error) => reject(error),
+      async () => {
+        try {
+          const url = await getDownloadURL(task.snapshot.ref);
+          resolve(url);
+        } catch (err) {
+          reject(err);
+        }
+      }
+    );
+  });
 }
 
 export async function loadCollection<T>(collectionName: string): Promise<T[]> {
