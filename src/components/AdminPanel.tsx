@@ -91,12 +91,23 @@ export default function AdminPanel({
   const [isMobileNavOpen, setIsMobileNavOpen] = useState(false);
 
   // Suivi des téléversements en cours vers Firebase Storage (identifiant de
-  // champ -> en cours ou non), pour afficher un indicateur et désactiver le
-  // bouton pendant l'envoi (qui prend maintenant un peu de temps, contrairement
-  // à l'ancienne conversion base64 locale qui était instantanée).
-  const [uploadingFields, setUploadingFields] = useState<Record<string, boolean>>({});
+  // champ -> pourcentage 0-100, absent = pas de téléversement en cours), pour
+  // afficher une vraie progression pendant l'envoi (utile pour les vidéos/audio
+  // qui peuvent prendre du temps selon la connexion) et désactiver le bouton.
+  const [uploadProgress, setUploadProgress] = useState<Record<string, number>>({});
+  const uploadingFields: Record<string, boolean> = Object.fromEntries(
+    Object.keys(uploadProgress).map((k) => [k, true])
+  );
   const setUploading = (field: string, value: boolean) => {
-    setUploadingFields(prev => ({ ...prev, [field]: value }));
+    setUploadProgress(prev => {
+      if (value) return { ...prev, [field]: 0 };
+      const next = { ...prev };
+      delete next[field];
+      return next;
+    });
+  };
+  const setUploadPercent = (field: string, percent: number) => {
+    setUploadProgress(prev => (field in prev ? { ...prev, [field]: percent } : prev));
   };
 
   // Navigation tabs: 'bookings' | 'dresses' | 'defile_videos' | 'settings' | 'team_testimonials'
@@ -1623,7 +1634,7 @@ export default function AdminPanel({
                       placeholder="https://images.unsplash.com/..."
                     />
                     <label className={`bg-zinc-800 hover:bg-zinc-900 text-white px-3.5 py-2.5 text-xs font-bold flex items-center justify-center cursor-pointer select-none rounded-lg shrink-0 ${uploadingFields.settingsBg ? 'opacity-60 pointer-events-none' : ''}`}>
-                      {uploadingFields.settingsBg ? 'Envoi...' : 'Téléverser'}
+                      {uploadingFields.settingsBg ? `Envoi... ${uploadProgress.settingsBg || 0}%` : 'Téléverser'}
                       <input
                         type="file"
                         accept="image/*,video/*"
@@ -1634,7 +1645,7 @@ export default function AdminPanel({
                           if (!file) return;
                           setUploading('settingsBg', true);
                           try {
-                            const url = await uploadFileToStorage(file, 'settings');
+                            const url = await uploadFileToStorage(file, 'settings', undefined, (p) => setUploadPercent('settingsBg', p));
                             setSettingsBg(url);
                           } catch (err) {
                             console.error('Erreur téléversement fond:', err);
@@ -1693,7 +1704,7 @@ export default function AdminPanel({
                         placeholder="https://www.soundhelix.com/examples/mp3/SoundHelix-Song-8.mp3"
                       />
                       <label className={`bg-zinc-800 hover:bg-zinc-900 text-white px-3.5 py-2.5 text-xs font-bold flex items-center justify-center cursor-pointer select-none rounded-lg shrink-0 ${uploadingFields.settingsMusic ? 'opacity-60 pointer-events-none' : ''}`}>
-                        {uploadingFields.settingsMusic ? 'Envoi...' : 'Téléverser MP3'}
+                        {uploadingFields.settingsMusic ? `Envoi... ${uploadProgress.settingsMusic || 0}%` : 'Téléverser MP3'}
                         <input
                           type="file"
                           accept="audio/*"
@@ -1704,7 +1715,7 @@ export default function AdminPanel({
                             if (!file) return;
                             setUploading('settingsMusic', true);
                             try {
-                              const url = await uploadFileToStorage(file, 'settings');
+                              const url = await uploadFileToStorage(file, 'settings', undefined, (p) => setUploadPercent('settingsMusic', p));
                               setSettingsMusicUrl(url);
                             } catch (err) {
                               console.error('Erreur téléversement musique:', err);
@@ -2029,7 +2040,7 @@ export default function AdminPanel({
                   <div className="flex justify-between items-center bg-zinc-50 p-2 border border-dashed rounded-lg">
                     <span className="text-[11px] text-zinc-500 font-sans">Ou sélectionnez une ou plusieurs images locales :</span>
                     <label className={`bg-zinc-800 hover:bg-zinc-900 text-white px-3 py-1.5 text-xs font-bold rounded cursor-pointer select-none ${uploadingFields.dressImages ? 'opacity-60 pointer-events-none' : ''}`}>
-                      {uploadingFields.dressImages ? 'Envoi en cours...' : 'Choisir des images'}
+                      {uploadingFields.dressImages ? `Envoi... ${uploadProgress.dressImages || 0}%` : 'Choisir des images'}
                       <input
                         type="file"
                         multiple
@@ -2041,15 +2052,26 @@ export default function AdminPanel({
                           if (!files || files.length === 0) return;
                           const fileList = Array.from(files);
                           setUploading('dressImages', true);
+                          let completedCount = 0;
+                          const totalCount = fileList.length;
                           try {
                             const results = await Promise.all(
                               fileList.map(async (file) => {
                                 const blob = await prepareImageForUpload(file);
-                                if (!blob) return null;
+                                if (!blob) {
+                                  completedCount += 1;
+                                  setUploadPercent('dressImages', Math.round((completedCount / totalCount) * 100));
+                                  return null;
+                                }
                                 try {
-                                  return await uploadFileToStorage(blob, 'dresses', file.name.replace(/\.\w+$/, '.jpg'));
+                                  const url = await uploadFileToStorage(blob, 'dresses', file.name.replace(/\.\w+$/, '.jpg'));
+                                  completedCount += 1;
+                                  setUploadPercent('dressImages', Math.round((completedCount / totalCount) * 100));
+                                  return url;
                                 } catch (uploadErr) {
                                   console.error('Échec envoi Storage:', uploadErr);
+                                  completedCount += 1;
+                                  setUploadPercent('dressImages', Math.round((completedCount / totalCount) * 100));
                                   return null;
                                 }
                               })
@@ -2093,7 +2115,7 @@ export default function AdminPanel({
                       placeholder="https://assets.mixkit.co/..."
                     />
                     <label className={`bg-zinc-800 hover:bg-zinc-900 text-white px-3 py-2 text-xs font-bold flex items-center justify-center cursor-pointer select-none rounded-lg shrink-0 ${uploadingFields.dressVideo ? 'opacity-60 pointer-events-none' : ''}`}>
-                      {uploadingFields.dressVideo ? 'Envoi...' : 'Téléverser MP4'}
+                      {uploadingFields.dressVideo ? `Envoi... ${uploadProgress.dressVideo || 0}%` : 'Téléverser MP4'}
                       <input
                         type="file"
                         accept="video/*"
@@ -2108,7 +2130,7 @@ export default function AdminPanel({
                           }
                           setUploading('dressVideo', true);
                           try {
-                            const url = await uploadFileToStorage(file, 'dresses');
+                            const url = await uploadFileToStorage(file, 'dresses', undefined, (p) => setUploadPercent('dressVideo', p));
                             setDressVideo(url);
                           } catch (err) {
                             console.error('Erreur téléversement vidéo robe:', err);
@@ -2205,7 +2227,7 @@ export default function AdminPanel({
                     placeholder="https://images.unsplash.com/..."
                   />
                   <label className={`bg-zinc-800 hover:bg-zinc-900 text-white px-3 py-2 text-xs font-bold flex items-center justify-center cursor-pointer select-none ${uploadingFields.teamPhoto ? 'opacity-60 pointer-events-none' : ''}`}>
-                    {uploadingFields.teamPhoto ? 'Envoi...' : 'Téléverser'}
+                    {uploadingFields.teamPhoto ? `Envoi... ${uploadProgress.teamPhoto || 0}%` : 'Téléverser'}
                     <input
                       type="file"
                       accept="image/*"
@@ -2221,7 +2243,7 @@ export default function AdminPanel({
                             alert("⚠️ Cette photo n'a pas pu être traitée (format non supporté, ex. HEIC). Convertissez-la en JPG/PNG et réessayez.");
                             return;
                           }
-                          const url = await uploadFileToStorage(blob, 'team', file.name.replace(/\.\w+$/, '.jpg'));
+                          const url = await uploadFileToStorage(blob, 'team', file.name.replace(/\.\w+$/, '.jpg'), (p) => setUploadPercent('teamPhoto', p));
                           setTeamPhoto(url);
                         } catch (err) {
                           console.error('Erreur téléversement photo équipe:', err);
@@ -2429,7 +2451,7 @@ export default function AdminPanel({
                     placeholder="https://images.unsplash.com/..."
                   />
                   <label className={`bg-zinc-800 hover:bg-zinc-900 text-white px-3.5 py-2.5 text-xs font-bold flex items-center justify-center cursor-pointer select-none rounded-lg shrink-0 ${uploadingFields.defileCover ? 'opacity-60 pointer-events-none' : ''}`}>
-                    {uploadingFields.defileCover ? 'Envoi...' : 'Téléverser'}
+                    {uploadingFields.defileCover ? `Envoi... ${uploadProgress.defileCover || 0}%` : 'Téléverser'}
                     <input
                       type="file"
                       accept="image/*"
@@ -2445,7 +2467,7 @@ export default function AdminPanel({
                             alert("⚠️ Cette photo n'a pas pu être traitée (format non supporté par le navigateur, ex. HEIC des iPhone). Convertissez-la en JPG ou PNG avant de l'importer.");
                             return;
                           }
-                          const url = await uploadFileToStorage(blob, 'defile', file.name.replace(/\.\w+$/, '.jpg'));
+                          const url = await uploadFileToStorage(blob, 'defile', file.name.replace(/\.\w+$/, '.jpg'), (p) => setUploadPercent('defileCover', p));
                           setDefileCoverImage(url);
                         } catch (err) {
                           console.error('Erreur téléversement couverture défilé:', err);
@@ -2474,7 +2496,7 @@ export default function AdminPanel({
                     placeholder="https://assets.mixkit.co/..."
                   />
                   <label className={`bg-zinc-800 hover:bg-zinc-900 text-white px-3.5 py-2.5 text-xs font-bold flex items-center justify-center cursor-pointer select-none rounded-lg shrink-0 ${uploadingFields.defileVideo ? 'opacity-60 pointer-events-none' : ''}`}>
-                    {uploadingFields.defileVideo ? 'Envoi...' : 'Téléverser MP4'}
+                    {uploadingFields.defileVideo ? `Envoi... ${uploadProgress.defileVideo || 0}%` : 'Téléverser MP4'}
                     <input
                       type="file"
                       accept="video/*"
@@ -2489,7 +2511,7 @@ export default function AdminPanel({
                         }
                         setUploading('defileVideo', true);
                         try {
-                          const url = await uploadFileToStorage(file, 'defile');
+                          const url = await uploadFileToStorage(file, 'defile', undefined, (p) => setUploadPercent('defileVideo', p));
                           setDefileVideoUrl(url);
                         } catch (err) {
                           console.error('Erreur téléversement vidéo défilé:', err);
