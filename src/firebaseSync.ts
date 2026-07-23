@@ -1,5 +1,39 @@
 import { supabase } from './lib/supabase';
 
+// ============================================================================
+// Conversion camelCase (JS) <-> snake_case (colonnes Postgres/Supabase)
+// ============================================================================
+// Les tables Supabase de ce projet utilisent des noms de colonnes en
+// snake_case (ex: "price_per_day"), alors que tout le code JavaScript/React
+// utilise du camelCase (ex: "pricePerDay"). Plutôt que de renommer les
+// colonnes ou de changer tout le code, on convertit automatiquement entre les
+// deux formats ici, au même endroit pour toutes les tables.
+const camelToSnake = (key: string): string =>
+  key.replace(/[A-Z]/g, (letter) => `_${letter.toLowerCase()}`);
+
+const snakeToCamel = (key: string): string =>
+  key.replace(/_([a-z0-9])/g, (_, letter) => letter.toUpperCase());
+
+function objectToSnakeCase(obj: Record<string, any>): Record<string, any> {
+  const result: Record<string, any> = {};
+  for (const key of Object.keys(obj)) {
+    result[camelToSnake(key)] = obj[key];
+  }
+  return result;
+}
+
+function objectToCamelCase(obj: Record<string, any>): Record<string, any> {
+  const result: Record<string, any> = {};
+  for (const key of Object.keys(obj)) {
+    result[snakeToCamel(key)] = obj[key];
+  }
+  return result;
+}
+
+function arrayToCamelCase<T>(rows: any[] | null): T[] {
+  return (rows || []).map((row) => objectToCamelCase(row)) as T[];
+}
+
 // Téléverse un fichier (photo, vidéo, audio) vers Supabase Storage (bucket
 // "media") et renvoie son URL publique. C'est CETTE url (une simple chaîne de
 // caractères) qui est ensuite stockée dans la table Supabase — jamais le
@@ -65,7 +99,7 @@ export async function loadCollection<T>(collectionName: string): Promise<T[]> {
     throw new Error(`Échec du chargement de "${collectionName}": ${error.message}`);
   }
 
-  return (data || []) as T[];
+  return arrayToCamelCase<T>(data);
 }
 
 export function subscribeCollection<T>(
@@ -83,7 +117,7 @@ export function subscribeCollection<T>(
           .select('*')
           .then(({ data, error }) => {
             if (!error && data) {
-              callback(data as T[]);
+              callback(arrayToCamelCase<T>(data));
             }
           });
       }
@@ -101,14 +135,15 @@ export async function addDocument(
 ) {
   const { data: insertedData, error } = await supabase
     .from(collectionName)
-    .insert([data])
+    .insert([objectToSnakeCase(data)])
     .select();
 
   if (error) {
     throw new Error(`Échec de l'ajout dans "${collectionName}": ${error.message}`);
   }
 
-  return insertedData?.[0];
+  const row = insertedData?.[0];
+  return row ? objectToCamelCase(row) : row;
 }
 
 export async function updateDocument(
@@ -118,7 +153,7 @@ export async function updateDocument(
 ) {
   const { data: updatedData, error } = await supabase
     .from(collectionName)
-    .update(data)
+    .update(objectToSnakeCase(data))
     .eq('id', id)
     .select();
 
@@ -126,7 +161,8 @@ export async function updateDocument(
     throw new Error(`Échec de la mise à jour dans "${collectionName}": ${error.message}`);
   }
 
-  return updatedData?.[0];
+  const row = updatedData?.[0];
+  return row ? objectToCamelCase(row) : row;
 }
 
 export async function deleteDocument(
@@ -150,7 +186,7 @@ export async function saveCollection(
   if (data.length === 0) return;
   const { error } = await supabase
     .from(collectionName)
-    .upsert(data, { onConflict: 'id' });
+    .upsert(data.map(objectToSnakeCase), { onConflict: 'id' });
 
   if (error) {
     throw new Error(`Échec de l'enregistrement dans "${collectionName}": ${error.message}`);
