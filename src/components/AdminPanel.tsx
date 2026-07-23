@@ -6,7 +6,7 @@ import {
 } from 'lucide-react';
 import { motion } from 'motion/react';
 import { Dress, Booking, TeamMember, Testimonial, AppSettings, Category, DefileVideo } from '../types';
-import { addDocument, deleteDocument, saveCollection, updateDocument } from '../firebaseSync';
+import { addDocument, deleteDocument, saveCollection, updateDocument, uploadFileToStorage } from '../firebaseSync';
 
 const ADMIN_CREDENTIALS_KEY = 'boutique_admin_credentials';
 
@@ -89,6 +89,15 @@ export default function AdminPanel({
 
   // Mobile navigation state
   const [isMobileNavOpen, setIsMobileNavOpen] = useState(false);
+
+  // Suivi des téléversements en cours vers Firebase Storage (identifiant de
+  // champ -> en cours ou non), pour afficher un indicateur et désactiver le
+  // bouton pendant l'envoi (qui prend maintenant un peu de temps, contrairement
+  // à l'ancienne conversion base64 locale qui était instantanée).
+  const [uploadingFields, setUploadingFields] = useState<Record<string, boolean>>({});
+  const setUploading = (field: string, value: boolean) => {
+    setUploadingFields(prev => ({ ...prev, [field]: value }));
+  };
 
   // Navigation tabs: 'bookings' | 'dresses' | 'defile_videos' | 'settings' | 'team_testimonials'
   const [activeTab, setActiveTab] = useState<'bookings' | 'dresses' | 'defile_videos' | 'settings' | 'team_testimonials'>('bookings');
@@ -189,6 +198,41 @@ export default function AdminPanel({
         resolve(null);
       };
     });
+  };
+
+  // Convertit une chaîne base64 (data URL) en Blob, pour pouvoir l'envoyer à
+  // Firebase Storage (qui attend un fichier/Blob, pas une chaîne de caractères).
+  const dataUrlToBlob = (dataUrl: string): Blob => {
+    const [header, base64Data] = dataUrl.split(',');
+    const mimeMatch = header.match(/:(.*?);/);
+    const mime = mimeMatch ? mimeMatch[1] : 'application/octet-stream';
+    const binary = atob(base64Data);
+    const bytes = new Uint8Array(binary.length);
+    for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
+    return new Blob([bytes], { type: mime });
+  };
+
+  // Pipeline complet pour une photo : conversion HEIC/HEIF → JPEG si besoin
+  // (photos iPhone), compression (pour rester léger et rapide), puis renvoie
+  // un Blob prêt à être envoyé à Firebase Storage. Renvoie null si le fichier
+  // n'a pas pu être traité (format non supporté par le navigateur).
+  const prepareImageForUpload = async (file: File): Promise<Blob | null> => {
+    try {
+      const displayableFile = await toDisplayableImageFile(file);
+      const dataUrl: string | null = await new Promise((resolve) => {
+        const reader = new FileReader();
+        reader.onload = (event) => resolve((event.target?.result as string) || null);
+        reader.onerror = () => resolve(null);
+        reader.readAsDataURL(displayableFile as File);
+      });
+      if (!dataUrl) return null;
+      const compressed = await compressBase64Image(dataUrl, 1200, 1200, 0.75);
+      if (!compressed) return null;
+      return dataUrlToBlob(compressed);
+    } catch (error) {
+      console.error('Échec de la préparation de l\'image :', error);
+      return null;
+    }
   };
 
   // Team & Testimonials Modal States
@@ -308,14 +352,21 @@ export default function AdminPanel({
   const updateBookingStatus = (id: string, newStatus: 'confirmed' | 'cancelled') => {
     const updated = bookings.map(b => b.id === id ? { ...b, status: newStatus } : b);
     setBookings(updated);
-    void saveCollection('bookings', updated);
+    saveCollection('bookings', updated).catch((error) => {
+      console.error('Échec de la mise à jour de la réservation sur Firestore', error);
+      alert("⚠️ Le statut s'affiche ici mais n'a PAS pu être enregistré sur le serveur. Vérifiez votre connexion et réessayez, sinon ce changement sera perdu au rechargement de la page.");
+    });
   };
 
   const deleteBooking = (id: string) => {
     if (window.confirm('Voulez-vous vraiment supprimer cette réservation de la base de données ?')) {
       const updated = bookings.filter(b => b.id !== id);
       setBookings(updated);
-      void deleteDocument('bookings', id);
+      deleteDocument('bookings', id).catch((error) => {
+        console.error('Échec de la suppression de la réservation sur Firestore', error);
+        alert("⚠️ Échec de la suppression sur le serveur. Vérifiez votre connexion et réessayez.");
+        setBookings(bookings);
+      });
     }
   };
 
@@ -418,7 +469,11 @@ export default function AdminPanel({
     if (window.confirm('Voulez-vous supprimer cette robe définitivement ?')) {
       const updated = dresses.filter(d => d.id !== id);
       setDresses(updated);
-      void deleteDocument('dresses', id);
+      deleteDocument('dresses', id).catch((error) => {
+        console.error('Échec de la suppression de la robe sur Firestore', error);
+        alert("⚠️ Échec de la suppression sur le serveur. Vérifiez votre connexion et réessayez.");
+        setDresses(dresses);
+      });
     }
   };
 
@@ -461,7 +516,11 @@ export default function AdminPanel({
         aspectRatio: defileAspectRatio
       } : v);
       setDefileVideos(updated);
-      void updateDocument('videos', editingDefile.id, updated.find(v => v.id === editingDefile.id));
+      updateDocument('videos', editingDefile.id, updated.find(v => v.id === editingDefile.id))
+        .catch((error) => {
+          console.error('Échec de la sauvegarde de la vidéo de défilé sur Firestore', error);
+          alert("⚠️ La vidéo s'affiche ici mais n'a PAS pu être enregistrée sur le serveur. Vérifiez votre connexion et réessayez, sinon ce changement sera perdu au rechargement de la page.");
+        });
     } else {
       const newDefile: DefileVideo = {
         id: 'defile-' + Date.now(),
@@ -474,9 +533,14 @@ export default function AdminPanel({
       };
       const updated = [newDefile, ...defileVideos];
       setDefileVideos(updated);
-      void addDocument('videos', newDefile).then((docRef) => {
-        setDefileVideos((current) => current.map((video) => video.id === newDefile.id ? { ...video, id: docRef.id } : video));
-      });
+      addDocument('videos', newDefile)
+        .then((docRef) => {
+          setDefileVideos((current) => current.map((video) => video.id === newDefile.id ? { ...video, id: docRef.id } : video));
+        })
+        .catch((error) => {
+          console.error('Échec de la création de la vidéo de défilé sur Firestore', error);
+          alert("⚠️ La vidéo s'affiche ici mais n'a PAS pu être enregistrée sur le serveur. Vérifiez votre connexion et réessayez, sinon elle disparaîtra au rechargement de la page.");
+        });
     }
     setIsDefileModalOpen(false);
   };
@@ -485,7 +549,11 @@ export default function AdminPanel({
     if (window.confirm('Voulez-vous supprimer cette vidéo de défilé définitivement ?')) {
       const updated = defileVideos.filter(v => v.id !== id);
       setDefileVideos(updated);
-      void deleteDocument('videos', id);
+      deleteDocument('videos', id).catch((error) => {
+        console.error('Échec de la suppression de la vidéo sur Firestore', error);
+        alert("⚠️ Échec de la suppression sur le serveur. Vérifiez votre connexion et réessayez.");
+        setDefileVideos(defileVideos);
+      });
     }
   };
 
@@ -525,7 +593,11 @@ export default function AdminPanel({
         emailAlarm: teamEmailAlarm
       } : t);
       setTeam(updated);
-      void updateDocument('team', editingTeam.id, updated.find(t => t.id === editingTeam.id));
+      updateDocument('team', editingTeam.id, updated.find(t => t.id === editingTeam.id))
+        .catch((error) => {
+          console.error('Échec de la sauvegarde du membre sur Firestore', error);
+          alert("⚠️ Ce membre s'affiche ici mais n'a PAS pu être enregistré sur le serveur. Vérifiez votre connexion et réessayez, sinon ce changement sera perdu au rechargement de la page.");
+        });
     } else {
       const newMember: TeamMember = {
         id: 'team-' + Date.now(),
@@ -537,9 +609,14 @@ export default function AdminPanel({
       };
       const updated = [...team, newMember];
       setTeam(updated);
-      void addDocument('team', newMember).then((docRef) => {
-        setTeam((current) => current.map((member) => member.id === newMember.id ? { ...member, id: docRef.id } : member));
-      });
+      addDocument('team', newMember)
+        .then((docRef) => {
+          setTeam((current) => current.map((member) => member.id === newMember.id ? { ...member, id: docRef.id } : member));
+        })
+        .catch((error) => {
+          console.error('Échec de la création du membre sur Firestore', error);
+          alert("⚠️ Ce membre s'affiche ici mais n'a PAS pu être enregistré sur le serveur. Vérifiez votre connexion et réessayez, sinon il disparaîtra au rechargement de la page.");
+        });
     }
     setIsTeamModalOpen(false);
   };
@@ -548,7 +625,11 @@ export default function AdminPanel({
     if (window.confirm('Retirer ce membre de l\'équipe ?')) {
       const updated = team.filter(t => t.id !== id);
       setTeam(updated);
-      void deleteDocument('team', id);
+      deleteDocument('team', id).catch((error) => {
+        console.error('Échec de la suppression du membre sur Firestore', error);
+        alert("⚠️ Échec de la suppression sur le serveur. Vérifiez votre connexion et réessayez.");
+        setTeam(team);
+      });
     }
   };
 
@@ -585,7 +666,11 @@ export default function AdminPanel({
         date: t.date // Keep original date
       } : t);
       setTestimonials(updated);
-      void updateDocument('testimonials', editingTestimonial.id, updated.find(t => t.id === editingTestimonial.id));
+      updateDocument('testimonials', editingTestimonial.id, updated.find(t => t.id === editingTestimonial.id))
+        .catch((error) => {
+          console.error('Échec de la sauvegarde du témoignage sur Firestore', error);
+          alert("⚠️ Ce témoignage s'affiche ici mais n'a PAS pu être enregistré sur le serveur. Vérifiez votre connexion et réessayez, sinon ce changement sera perdu au rechargement de la page.");
+        });
     } else {
       const newTest: Testimonial = {
         id: 'test-' + Date.now(),
@@ -597,9 +682,14 @@ export default function AdminPanel({
       };
       const updated = [newTest, ...testimonials];
       setTestimonials(updated);
-      void addDocument('testimonials', newTest).then((docRef) => {
-        setTestimonials((current) => current.map((testimonial) => testimonial.id === newTest.id ? { ...testimonial, id: docRef.id } : testimonial));
-      });
+      addDocument('testimonials', newTest)
+        .then((docRef) => {
+          setTestimonials((current) => current.map((testimonial) => testimonial.id === newTest.id ? { ...testimonial, id: docRef.id } : testimonial));
+        })
+        .catch((error) => {
+          console.error('Échec de la création du témoignage sur Firestore', error);
+          alert("⚠️ Ce témoignage s'affiche ici mais n'a PAS pu être enregistré sur le serveur. Vérifiez votre connexion et réessayez, sinon il disparaîtra au rechargement de la page.");
+        });
     }
     setIsTestimonialModalOpen(false);
   };
@@ -608,7 +698,11 @@ export default function AdminPanel({
     if (window.confirm('Supprimer ce témoignage ?')) {
       const updated = testimonials.filter(t => t.id !== id);
       setTestimonials(updated);
-      void deleteDocument('testimonials', id);
+      deleteDocument('testimonials', id).catch((error) => {
+        console.error('Échec de la suppression du témoignage sur Firestore', error);
+        alert("⚠️ Échec de la suppression sur le serveur. Vérifiez votre connexion et réessayez.");
+        setTestimonials(testimonials);
+      });
     }
   };
 
@@ -1528,22 +1622,25 @@ export default function AdminPanel({
                       className="flex-1 text-sm px-3.5 py-2.5 border border-zinc-200 rounded-lg focus:outline-none focus:border-gold-300 transition-colors"
                       placeholder="https://images.unsplash.com/..."
                     />
-                    <label className="bg-zinc-800 hover:bg-zinc-900 text-white px-3.5 py-2.5 text-xs font-bold flex items-center justify-center cursor-pointer select-none rounded-lg shrink-0">
-                      Téléverser
+                    <label className={`bg-zinc-800 hover:bg-zinc-900 text-white px-3.5 py-2.5 text-xs font-bold flex items-center justify-center cursor-pointer select-none rounded-lg shrink-0 ${uploadingFields.settingsBg ? 'opacity-60 pointer-events-none' : ''}`}>
+                      {uploadingFields.settingsBg ? 'Envoi...' : 'Téléverser'}
                       <input
                         type="file"
                         accept="image/*,video/*"
                         className="hidden"
-                        onChange={(e) => {
+                        disabled={uploadingFields.settingsBg}
+                        onChange={async (e) => {
                           const file = e.target.files?.[0];
-                          if (file) {
-                            const reader = new FileReader();
-                            reader.onload = (event) => {
-                              if (event.target?.result) {
-                                setSettingsBg(event.target.result as string);
-                              }
-                            };
-                            reader.readAsDataURL(file);
+                          if (!file) return;
+                          setUploading('settingsBg', true);
+                          try {
+                            const url = await uploadFileToStorage(file, 'settings');
+                            setSettingsBg(url);
+                          } catch (err) {
+                            console.error('Erreur téléversement fond:', err);
+                            alert("⚠️ Échec de l'envoi du fichier. Vérifiez votre connexion et réessayez.");
+                          } finally {
+                            setUploading('settingsBg', false);
                           }
                         }}
                       />
@@ -1595,22 +1692,25 @@ export default function AdminPanel({
                         className="w-full text-sm px-3.5 py-2.5 border border-zinc-200 rounded-lg focus:outline-none focus:border-gold-300 transition-colors font-mono text-xs"
                         placeholder="https://www.soundhelix.com/examples/mp3/SoundHelix-Song-8.mp3"
                       />
-                      <label className="bg-zinc-800 hover:bg-zinc-900 text-white px-3.5 py-2.5 text-xs font-bold flex items-center justify-center cursor-pointer select-none rounded-lg shrink-0">
-                        Téléverser MP3
+                      <label className={`bg-zinc-800 hover:bg-zinc-900 text-white px-3.5 py-2.5 text-xs font-bold flex items-center justify-center cursor-pointer select-none rounded-lg shrink-0 ${uploadingFields.settingsMusic ? 'opacity-60 pointer-events-none' : ''}`}>
+                        {uploadingFields.settingsMusic ? 'Envoi...' : 'Téléverser MP3'}
                         <input
                           type="file"
                           accept="audio/*"
                           className="hidden"
-                          onChange={(e) => {
+                          disabled={uploadingFields.settingsMusic}
+                          onChange={async (e) => {
                             const file = e.target.files?.[0];
-                            if (file) {
-                              const reader = new FileReader();
-                              reader.onload = (event) => {
-                                if (event.target?.result) {
-                                  setSettingsMusicUrl(event.target.result as string);
-                                }
-                              };
-                              reader.readAsDataURL(file);
+                            if (!file) return;
+                            setUploading('settingsMusic', true);
+                            try {
+                              const url = await uploadFileToStorage(file, 'settings');
+                              setSettingsMusicUrl(url);
+                            } catch (err) {
+                              console.error('Erreur téléversement musique:', err);
+                              alert("⚠️ Échec de l'envoi du fichier audio. Vérifiez votre connexion et réessayez.");
+                            } finally {
+                              setUploading('settingsMusic', false);
                             }
                           }}
                         />
@@ -1928,51 +2028,48 @@ export default function AdminPanel({
                   />
                   <div className="flex justify-between items-center bg-zinc-50 p-2 border border-dashed rounded-lg">
                     <span className="text-[11px] text-zinc-500 font-sans">Ou sélectionnez une ou plusieurs images locales :</span>
-                    <label className="bg-zinc-800 hover:bg-zinc-900 text-white px-3 py-1.5 text-xs font-bold rounded cursor-pointer select-none">
-                      Choisir des images
+                    <label className={`bg-zinc-800 hover:bg-zinc-900 text-white px-3 py-1.5 text-xs font-bold rounded cursor-pointer select-none ${uploadingFields.dressImages ? 'opacity-60 pointer-events-none' : ''}`}>
+                      {uploadingFields.dressImages ? 'Envoi en cours...' : 'Choisir des images'}
                       <input
                         type="file"
                         multiple
                         accept="image/*"
                         className="hidden"
-                        onChange={(e) => {
+                        disabled={uploadingFields.dressImages}
+                        onChange={async (e) => {
                           const files = e.target.files;
-                          if (files && files.length > 0) {
-                            const fileList = Array.from(files);
-                            Promise.all(
-                              fileList.map(
-                                (file) =>
-                                  new Promise<string | null>((resolveFile) => {
-                                    const reader = new FileReader();
-                                    reader.onload = async (event) => {
-                                      if (event.target?.result) {
-                                        const compressed = await compressBase64Image(event.target.result as string, 700, 700, 0.6);
-                                        resolveFile(compressed);
-                                      } else {
-                                        resolveFile(null);
-                                      }
-                                    };
-                                    reader.onerror = () => resolveFile(null);
-                                    reader.readAsDataURL(file as any);
-                                  })
-                              )
-                            ).then((results) => {
-                              const failedCount = results.filter((r) => r === null).length;
-                              const successResults = results.filter((r): r is string => r !== null);
-                              if (successResults.length > 0) {
-                                const currentImages = dressImages.trim();
-                                const separator = currentImages ? ', ' : '';
-                                setDressImages(currentImages + separator + successResults.join(', '));
-                              }
-                              if (failedCount > 0) {
-                                alert(
-                                  `⚠️ ${failedCount} photo(s) n'ont pas pu être traitées (format non supporté par le navigateur, ex. HEIC des iPhone). ` +
-                                  'Convertissez-les en JPG ou PNG avant de les importer.'
-                                );
-                              }
-                              // On réinitialise l'input pour permettre de resélectionner les mêmes fichiers si besoin.
-                              e.target.value = '';
-                            });
+                          if (!files || files.length === 0) return;
+                          const fileList = Array.from(files);
+                          setUploading('dressImages', true);
+                          try {
+                            const results = await Promise.all(
+                              fileList.map(async (file) => {
+                                const blob = await prepareImageForUpload(file);
+                                if (!blob) return null;
+                                try {
+                                  return await uploadFileToStorage(blob, 'dresses', file.name.replace(/\.\w+$/, '.jpg'));
+                                } catch (uploadErr) {
+                                  console.error('Échec envoi Storage:', uploadErr);
+                                  return null;
+                                }
+                              })
+                            );
+                            const failedCount = results.filter((r) => r === null).length;
+                            const successResults = results.filter((r): r is string => r !== null);
+                            if (successResults.length > 0) {
+                              const currentImages = dressImages.trim();
+                              const separator = currentImages ? ', ' : '';
+                              setDressImages(currentImages + separator + successResults.join(', '));
+                            }
+                            if (failedCount > 0) {
+                              alert(
+                                `⚠️ ${failedCount} photo(s) n'ont pas pu être envoyées (format non supporté, ex. HEIC, ou problème de connexion). ` +
+                                'Convertissez-les en JPG/PNG et réessayez, ou vérifiez votre connexion internet.'
+                              );
+                            }
+                          } finally {
+                            setUploading('dressImages', false);
+                            e.target.value = '';
                           }
                         }}
                       />
@@ -1995,26 +2092,29 @@ export default function AdminPanel({
                       className="flex-1 p-2.5 border rounded-lg font-mono text-xs"
                       placeholder="https://assets.mixkit.co/..."
                     />
-                    <label className="bg-zinc-800 hover:bg-zinc-900 text-white px-3 py-2 text-xs font-bold flex items-center justify-center cursor-pointer select-none rounded-lg shrink-0">
-                      Téléverser MP4
+                    <label className={`bg-zinc-800 hover:bg-zinc-900 text-white px-3 py-2 text-xs font-bold flex items-center justify-center cursor-pointer select-none rounded-lg shrink-0 ${uploadingFields.dressVideo ? 'opacity-60 pointer-events-none' : ''}`}>
+                      {uploadingFields.dressVideo ? 'Envoi...' : 'Téléverser MP4'}
                       <input
                         type="file"
                         accept="video/*"
                         className="hidden"
-                        onChange={(e) => {
+                        disabled={uploadingFields.dressVideo}
+                        onChange={async (e) => {
                           const file = e.target.files?.[0];
-                          if (file) {
-                            if (file.size > 2 * 1024 * 1024) {
-                              alert(`⚠️ Ce fichier vidéo est trop volumineux (${(file.size / (1024 * 1024)).toFixed(1)} Mo). Pour éviter de saturer l'espace de stockage, veuillez choisir une vidéo de moins de 2 Mo ou utiliser un lien URL direct.`);
-                              return;
-                            }
-                            const reader = new FileReader();
-                            reader.onload = (event) => {
-                              if (event.target?.result) {
-                                setDressVideo(event.target.result as string);
-                              }
-                            };
-                            reader.readAsDataURL(file);
+                          if (!file) return;
+                          if (file.size > 50 * 1024 * 1024) {
+                            alert(`⚠️ Ce fichier vidéo est trop volumineux (${(file.size / (1024 * 1024)).toFixed(1)} Mo). Choisissez une vidéo de moins de 50 Mo ou utilisez un lien URL direct.`);
+                            return;
+                          }
+                          setUploading('dressVideo', true);
+                          try {
+                            const url = await uploadFileToStorage(file, 'dresses');
+                            setDressVideo(url);
+                          } catch (err) {
+                            console.error('Erreur téléversement vidéo robe:', err);
+                            alert("⚠️ Échec de l'envoi de la vidéo. Vérifiez votre connexion et réessayez.");
+                          } finally {
+                            setUploading('dressVideo', false);
                           }
                         }}
                       />
@@ -2104,22 +2204,30 @@ export default function AdminPanel({
                     className="flex-1 p-2.5 border rounded-lg font-mono text-xs"
                     placeholder="https://images.unsplash.com/..."
                   />
-                  <label className="bg-zinc-800 hover:bg-zinc-900 text-white px-3 py-2 text-xs font-bold flex items-center justify-center cursor-pointer select-none">
-                    Téléverser
+                  <label className={`bg-zinc-800 hover:bg-zinc-900 text-white px-3 py-2 text-xs font-bold flex items-center justify-center cursor-pointer select-none ${uploadingFields.teamPhoto ? 'opacity-60 pointer-events-none' : ''}`}>
+                    {uploadingFields.teamPhoto ? 'Envoi...' : 'Téléverser'}
                     <input
                       type="file"
                       accept="image/*"
                       className="hidden"
-                      onChange={(e) => {
+                      disabled={uploadingFields.teamPhoto}
+                      onChange={async (e) => {
                         const file = e.target.files?.[0];
-                        if (file) {
-                          const reader = new FileReader();
-                          reader.onload = (event) => {
-                            if (event.target?.result) {
-                              setTeamPhoto(event.target.result as string);
-                            }
-                          };
-                          reader.readAsDataURL(file);
+                        if (!file) return;
+                        setUploading('teamPhoto', true);
+                        try {
+                          const blob = await prepareImageForUpload(file);
+                          if (!blob) {
+                            alert("⚠️ Cette photo n'a pas pu être traitée (format non supporté, ex. HEIC). Convertissez-la en JPG/PNG et réessayez.");
+                            return;
+                          }
+                          const url = await uploadFileToStorage(blob, 'team', file.name.replace(/\.\w+$/, '.jpg'));
+                          setTeamPhoto(url);
+                        } catch (err) {
+                          console.error('Erreur téléversement photo équipe:', err);
+                          alert("⚠️ Échec de l'envoi de la photo. Vérifiez votre connexion et réessayez.");
+                        } finally {
+                          setUploading('teamPhoto', false);
                         }
                       }}
                     />
@@ -2320,27 +2428,30 @@ export default function AdminPanel({
                     className="flex-1 p-2.5 border rounded-lg font-mono text-xs focus:ring-1 focus:ring-bento-gold focus:outline-none"
                     placeholder="https://images.unsplash.com/..."
                   />
-                  <label className="bg-zinc-800 hover:bg-zinc-900 text-white px-3.5 py-2.5 text-xs font-bold flex items-center justify-center cursor-pointer select-none rounded-lg shrink-0">
-                    Téléverser
+                  <label className={`bg-zinc-800 hover:bg-zinc-900 text-white px-3.5 py-2.5 text-xs font-bold flex items-center justify-center cursor-pointer select-none rounded-lg shrink-0 ${uploadingFields.defileCover ? 'opacity-60 pointer-events-none' : ''}`}>
+                    {uploadingFields.defileCover ? 'Envoi...' : 'Téléverser'}
                     <input
                       type="file"
                       accept="image/*"
                       className="hidden"
-                      onChange={(e) => {
+                      disabled={uploadingFields.defileCover}
+                      onChange={async (e) => {
                         const file = e.target.files?.[0];
-                        if (file) {
-                          const reader = new FileReader();
-                          reader.onload = async (event) => {
-                            if (event.target?.result) {
-                              const compressed = await compressBase64Image(event.target.result as string, 700, 700, 0.6);
-                              if (compressed) {
-                                setDefileCoverImage(compressed);
-                              } else {
-                                alert("⚠️ Cette photo n'a pas pu être traitée (format non supporté par le navigateur, ex. HEIC des iPhone). Convertissez-la en JPG ou PNG avant de l'importer.");
-                              }
-                            }
-                          };
-                          reader.readAsDataURL(file);
+                        if (!file) return;
+                        setUploading('defileCover', true);
+                        try {
+                          const blob = await prepareImageForUpload(file);
+                          if (!blob) {
+                            alert("⚠️ Cette photo n'a pas pu être traitée (format non supporté par le navigateur, ex. HEIC des iPhone). Convertissez-la en JPG ou PNG avant de l'importer.");
+                            return;
+                          }
+                          const url = await uploadFileToStorage(blob, 'defile', file.name.replace(/\.\w+$/, '.jpg'));
+                          setDefileCoverImage(url);
+                        } catch (err) {
+                          console.error('Erreur téléversement couverture défilé:', err);
+                          alert("⚠️ Échec de l'envoi de la photo. Vérifiez votre connexion et réessayez.");
+                        } finally {
+                          setUploading('defileCover', false);
                         }
                       }}
                     />
@@ -2362,26 +2473,29 @@ export default function AdminPanel({
                     className="flex-1 p-2.5 border rounded-lg font-mono text-xs focus:ring-1 focus:ring-bento-gold focus:outline-none"
                     placeholder="https://assets.mixkit.co/..."
                   />
-                  <label className="bg-zinc-800 hover:bg-zinc-900 text-white px-3.5 py-2.5 text-xs font-bold flex items-center justify-center cursor-pointer select-none rounded-lg shrink-0">
-                    Téléverser MP4
+                  <label className={`bg-zinc-800 hover:bg-zinc-900 text-white px-3.5 py-2.5 text-xs font-bold flex items-center justify-center cursor-pointer select-none rounded-lg shrink-0 ${uploadingFields.defileVideo ? 'opacity-60 pointer-events-none' : ''}`}>
+                    {uploadingFields.defileVideo ? 'Envoi...' : 'Téléverser MP4'}
                     <input
                       type="file"
                       accept="video/*"
                       className="hidden"
-                      onChange={(e) => {
+                      disabled={uploadingFields.defileVideo}
+                      onChange={async (e) => {
                         const file = e.target.files?.[0];
-                        if (file) {
-                          if (file.size > 2 * 1024 * 1024) {
-                            alert(`⚠️ Ce fichier vidéo est trop volumineux (${(file.size / (1024 * 1024)).toFixed(1)} Mo). Pour préserver l'espace de stockage, veuillez choisir une vidéo de moins de 2 Mo ou utiliser un lien URL direct.`);
-                            return;
-                          }
-                          const reader = new FileReader();
-                          reader.onload = (event) => {
-                            if (event.target?.result) {
-                              setDefileVideoUrl(event.target.result as string);
-                            }
-                          };
-                          reader.readAsDataURL(file);
+                        if (!file) return;
+                        if (file.size > 50 * 1024 * 1024) {
+                          alert(`⚠️ Ce fichier vidéo est trop volumineux (${(file.size / (1024 * 1024)).toFixed(1)} Mo). Choisissez une vidéo de moins de 50 Mo ou utilisez un lien URL direct.`);
+                          return;
+                        }
+                        setUploading('defileVideo', true);
+                        try {
+                          const url = await uploadFileToStorage(file, 'defile');
+                          setDefileVideoUrl(url);
+                        } catch (err) {
+                          console.error('Erreur téléversement vidéo défilé:', err);
+                          alert("⚠️ Échec de l'envoi de la vidéo. Vérifiez votre connexion et réessayez.");
+                        } finally {
+                          setUploading('defileVideo', false);
                         }
                       }}
                     />
