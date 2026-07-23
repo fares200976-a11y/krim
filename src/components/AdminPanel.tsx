@@ -393,7 +393,7 @@ export default function AdminPanel({
     setBookings(updated);
     saveCollection('bookings', updated).catch((error) => {
       console.error('Échec de la mise à jour de la réservation sur Supabase', error);
-      alert("⚠️ Le statut s'affiche ici mais n'a PAS pu être enregistré sur le serveur. Vérifiez votre connexion et réessayez, sinon ce changement sera perdu au rechargement de la page.");
+      alert("⚠️ Le statut s'affiche ici mais n'a PAS pu être enregistré sur le serveur.\n\nDétail : " + (error?.message || error) + "\n\nCe changement sera perdu au rechargement de la page.");
     });
   };
 
@@ -403,7 +403,7 @@ export default function AdminPanel({
       setBookings(updated);
       deleteDocument('bookings', id).catch((error) => {
         console.error('Échec de la suppression de la réservation sur Supabase', error);
-        alert("⚠️ Échec de la suppression sur le serveur. Vérifiez votre connexion et réessayez.");
+        alert("⚠️ Échec de la suppression sur le serveur.\n\nDétail : " + (error?.message || error));
         setBookings(bookings);
       });
     }
@@ -510,7 +510,7 @@ export default function AdminPanel({
       setDresses(updated);
       deleteDocument('dresses', id).catch((error) => {
         console.error('Échec de la suppression de la robe sur Supabase', error);
-        alert("⚠️ Échec de la suppression sur le serveur. Vérifiez votre connexion et réessayez.");
+        alert("⚠️ Échec de la suppression sur le serveur.\n\nDétail : " + (error?.message || error));
         setDresses(dresses);
       });
     }
@@ -558,7 +558,7 @@ export default function AdminPanel({
       updateDocument('videos', editingDefile.id, updated.find(v => v.id === editingDefile.id))
         .catch((error) => {
           console.error('Échec de la sauvegarde de la vidéo de défilé sur Supabase', error);
-          alert("⚠️ La vidéo s'affiche ici mais n'a PAS pu être enregistrée sur le serveur. Vérifiez votre connexion et réessayez, sinon ce changement sera perdu au rechargement de la page.");
+          alert("⚠️ La vidéo s'affiche ici mais n'a PAS pu être enregistrée sur le serveur.\n\nDétail : " + (error?.message || error) + "\n\nCe changement sera perdu au rechargement de la page.");
         });
     } else {
       const newDefile: DefileVideo = {
@@ -578,7 +578,7 @@ export default function AdminPanel({
         })
         .catch((error) => {
           console.error('Échec de la création de la vidéo de défilé sur Supabase', error);
-          alert("⚠️ La vidéo s'affiche ici mais n'a PAS pu être enregistrée sur le serveur. Vérifiez votre connexion et réessayez, sinon elle disparaîtra au rechargement de la page.");
+          alert("⚠️ La vidéo s'affiche ici mais n'a PAS pu être enregistrée sur le serveur.\n\nDétail : " + (error?.message || error) + "\n\nElle disparaîtra au rechargement de la page.");
         });
     }
     setIsDefileModalOpen(false);
@@ -590,7 +590,7 @@ export default function AdminPanel({
       setDefileVideos(updated);
       deleteDocument('videos', id).catch((error) => {
         console.error('Échec de la suppression de la vidéo sur Supabase', error);
-        alert("⚠️ Échec de la suppression sur le serveur. Vérifiez votre connexion et réessayez.");
+        alert("⚠️ Échec de la suppression sur le serveur.\n\nDétail : " + (error?.message || error));
         setDefileVideos(defileVideos);
       });
     }
@@ -635,7 +635,7 @@ export default function AdminPanel({
       updateDocument('team', editingTeam.id, updated.find(t => t.id === editingTeam.id))
         .catch((error) => {
           console.error('Échec de la sauvegarde du membre sur Supabase', error);
-          alert("⚠️ Ce membre s'affiche ici mais n'a PAS pu être enregistré sur le serveur. Vérifiez votre connexion et réessayez, sinon ce changement sera perdu au rechargement de la page.");
+          alert("⚠️ Ce membre s'affiche ici mais n'a PAS pu être enregistré sur le serveur.\n\nDétail : " + (error?.message || error) + "\n\nCe changement sera perdu au rechargement de la page.");
         });
     } else {
       const newMember: TeamMember = {
@@ -654,7 +654,7 @@ export default function AdminPanel({
         })
         .catch((error) => {
           console.error('Échec de la création du membre sur Supabase', error);
-          alert("⚠️ Ce membre s'affiche ici mais n'a PAS pu être enregistré sur le serveur. Vérifiez votre connexion et réessayez, sinon il disparaîtra au rechargement de la page.");
+          alert("⚠️ Ce membre s'affiche ici mais n'a PAS pu être enregistré sur le serveur.\n\nDétail : " + (error?.message || error) + "\n\nIl disparaîtra au rechargement de la page.");
         });
     }
     setIsTeamModalOpen(false);
@@ -666,7 +666,7 @@ export default function AdminPanel({
       setTeam(updated);
       deleteDocument('team', id).catch((error) => {
         console.error('Échec de la suppression du membre sur Supabase', error);
-        alert("⚠️ Échec de la suppression sur le serveur. Vérifiez votre connexion et réessayez.");
+        alert("⚠️ Échec de la suppression sur le serveur.\n\nDétail : " + (error?.message || error));
         setTeam(team);
       });
     }
@@ -708,7 +708,7 @@ export default function AdminPanel({
       updateDocument('testimonials', editingTestimonial.id, updated.find(t => t.id === editingTestimonial.id))
         .catch((error) => {
           console.error('Échec de la sauvegarde du témoignage sur Supabase', error);
-          alert("⚠️ Ce témoignage s'affiche ici mais n'a PAS pu être enregistré sur le serveur. Vérifiez votre connexion et réessayez, sinon ce changement sera perdu au rechargement de la page.");
+          alert("⚠️ Ce témoignage s'affiche ici mais n'a PAS pu être enregistré sur le serveur.\n\nDétail : " + (error?.message || error) + "\n\nCe changement sera perdu au rechargement de la page.");
         });
     } else {
       const newTest: Testimonial = {
@@ -727,7 +727,7 @@ export default function AdminPanel({
         })
         .catch((error) => {
           console.error('Échec de la création du témoignage sur Supabase', error);
-          alert("⚠️ Ce témoignage s'affiche ici mais n'a PAS pu être enregistré sur le serveur. Vérifiez votre connexion et réessayez, sinon il disparaîtra au rechargement de la page.");
+          alert("⚠️ Ce témoignage s'affiche ici mais n'a PAS pu être enregistré sur le serveur.\n\nDétail : " + (error?.message || error) + "\n\nIl disparaîtra au rechargement de la page.");
         });
     }
     setIsTestimonialModalOpen(false);
@@ -739,7 +739,7 @@ export default function AdminPanel({
       setTestimonials(updated);
       deleteDocument('testimonials', id).catch((error) => {
         console.error('Échec de la suppression du témoignage sur Supabase', error);
-        alert("⚠️ Échec de la suppression sur le serveur. Vérifiez votre connexion et réessayez.");
+        alert("⚠️ Échec de la suppression sur le serveur.\n\nDétail : " + (error?.message || error));
         setTestimonials(testimonials);
       });
     }
@@ -1709,7 +1709,7 @@ export default function AdminPanel({
                             setSettingsBg(url);
                           } catch (err) {
                             console.error('Erreur téléversement fond:', err);
-                            alert("⚠️ Échec de l'envoi du fichier. Vérifiez votre connexion et réessayez.");
+                            alert("⚠️ Échec de l'envoi du fichier.\n\nDétail : " + (err?.message || err));
                           } finally {
                             setUploading('settingsBg', false);
                           }
@@ -1779,7 +1779,7 @@ export default function AdminPanel({
                               setSettingsMusicUrl(url);
                             } catch (err) {
                               console.error('Erreur téléversement musique:', err);
-                              alert("⚠️ Échec de l'envoi du fichier audio. Vérifiez votre connexion et réessayez.");
+                              alert("⚠️ Échec de l'envoi du fichier audio.\n\nDétail : " + (err?.message || err));
                             } finally {
                               setUploading('settingsMusic', false);
                             }
@@ -2115,6 +2115,7 @@ export default function AdminPanel({
                           setUploading('dressImages', true);
                           let completedCount = 0;
                           const totalCount = fileList.length;
+                          const errorMessages: string[] = [];
                           try {
                             const results = await Promise.all(
                               fileList.map(async (file) => {
@@ -2122,6 +2123,7 @@ export default function AdminPanel({
                                 if (!blob) {
                                   completedCount += 1;
                                   setUploadPercent('dressImages', Math.round((completedCount / totalCount) * 100));
+                                  errorMessages.push(`${file.name} : format non supporté (essayez de le convertir en JPG/PNG)`);
                                   return null;
                                 }
                                 try {
@@ -2129,10 +2131,11 @@ export default function AdminPanel({
                                   completedCount += 1;
                                   setUploadPercent('dressImages', Math.round((completedCount / totalCount) * 100));
                                   return url;
-                                } catch (uploadErr) {
+                                } catch (uploadErr: any) {
                                   console.error('Échec envoi Storage:', uploadErr);
                                   completedCount += 1;
                                   setUploadPercent('dressImages', Math.round((completedCount / totalCount) * 100));
+                                  errorMessages.push(`${file.name} : ${uploadErr?.message || uploadErr}`);
                                   return null;
                                 }
                               })
@@ -2146,8 +2149,7 @@ export default function AdminPanel({
                             }
                             if (failedCount > 0) {
                               alert(
-                                `⚠️ ${failedCount} photo(s) n'ont pas pu être envoyées (format non supporté, ex. HEIC, ou problème de connexion). ` +
-                                'Convertissez-les en JPG/PNG et réessayez, ou vérifiez votre connexion internet.'
+                                `⚠️ ${failedCount} photo(s) n'ont pas pu être envoyées :\n\n` + errorMessages.join('\n')
                               );
                             }
                           } finally {
@@ -2195,7 +2197,7 @@ export default function AdminPanel({
                             setDressVideo(url);
                           } catch (err) {
                             console.error('Erreur téléversement vidéo robe:', err);
-                            alert("⚠️ Échec de l'envoi de la vidéo. Vérifiez votre connexion et réessayez.");
+                            alert("⚠️ Échec de l'envoi de la vidéo.\n\nDétail : " + (err?.message || err));
                           } finally {
                             setUploading('dressVideo', false);
                           }
@@ -2308,7 +2310,7 @@ export default function AdminPanel({
                           setTeamPhoto(url);
                         } catch (err) {
                           console.error('Erreur téléversement photo équipe:', err);
-                          alert("⚠️ Échec de l'envoi de la photo. Vérifiez votre connexion et réessayez.");
+                          alert("⚠️ Échec de l'envoi de la photo.\n\nDétail : " + (err?.message || err));
                         } finally {
                           setUploading('teamPhoto', false);
                         }
@@ -2532,7 +2534,7 @@ export default function AdminPanel({
                           setDefileCoverImage(url);
                         } catch (err) {
                           console.error('Erreur téléversement couverture défilé:', err);
-                          alert("⚠️ Échec de l'envoi de la photo. Vérifiez votre connexion et réessayez.");
+                          alert("⚠️ Échec de l'envoi de la photo.\n\nDétail : " + (err?.message || err));
                         } finally {
                           setUploading('defileCover', false);
                         }
@@ -2576,7 +2578,7 @@ export default function AdminPanel({
                           setDefileVideoUrl(url);
                         } catch (err) {
                           console.error('Erreur téléversement vidéo défilé:', err);
-                          alert("⚠️ Échec de l'envoi de la vidéo. Vérifiez votre connexion et réessayez.");
+                          alert("⚠️ Échec de l'envoi de la vidéo.\n\nDétail : " + (err?.message || err));
                         } finally {
                           setUploading('defileVideo', false);
                         }
